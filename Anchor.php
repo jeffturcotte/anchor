@@ -16,27 +16,101 @@ class AnchorProgrammerException extends Exception {}
 
 class AnchorDefaultAdapter {
 	function notFound() {
-		header("HTTP/1.1 404 Not Found");
+		if (!headers_sent()) {
+			header("HTTP/1.1 404 Not Found");
+		}
 		echo '<h1>NOT FOUND</h1>';
 		echo "\n\n";
 	}
 }
 
 class Anchor {
-	private static $active_callback = array();
+	/**
+	 * undocumented variable
+	 *
+	 * @var object
+	 */
+	private $url;
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
+	private $headers;
+
+	/**
+	 * undocumented variable
+	 *
+	 * @var object
+	 */
+	private $callback;
+
+	/**
+	 * undocumented variable
+	 *
+	 * @var object
+	 */
+	private $closure;
+
+	/**
+	 * undocumented variable
+	 *
+	 * @var object
+	 */
+	private $data;
+	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
+	private static $authorized_adapters = array();
+	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
+	private static $active_callback = array();
+
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $cache = array(
 		'find' => array(),
 		'underscorize' => array(),
 		'camelize' => array()
 	);
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $closure_aliases = array();
 	
-	private static $data = NULL;
+	/**
+	 * undocumented variable
+	 *
+	 * @var boolean
+	 */
+	private static $persistent_data = NULL;
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $hooks = array();
-
+	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $tokens = array(
 		'get'    => '[request-method=get]',
 		'post'   => '[request-method=post]',
@@ -46,13 +120,33 @@ class Anchor {
 		'json'   => '[accept-type=application/json]',
 		'xml'    => '[accept-type=text/xml]'
 	);
-
+	
+	/**
+	 * undocumented variable
+	 *
+	 * @var string
+	 */
 	private static $not_found_callback = 'AnchorDefaultAdapter::notFound';
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $routes = array();
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var string
+	 */
 	private static $request_path = NULL;
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $param_types = array(
 		':' => '[^/]+',
 		'$' => '[A-Za-z][A-Za-z0-9_]+',
@@ -60,22 +154,41 @@ class Anchor {
 		'@' => '[A-Za-z]+'
 	);
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $callback_param_names = array(
 		'namespace'    => 'namespace',
 		'short_class'  => 'class',
 		'short_method' => 'method'
 	);
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var array
+	 */
 	private static $callback_param_formatters = array(
 		'namespace'    => 'Anchor::underscorize',
 		'short_class'  => 'Anchor::upperCamelize',
 		'short_method' => 'Anchor::lowerCamelize'
 	);
 	
+	/**
+	 * undocumented variable
+	 *
+	 * @var string
+	 */
 	private static $namespace_separator = '\\';
 	
+	// ==============
+	// = Public API =
+	// ==============
+	
 	/**
-	 * undocumented function
+	 * adds a route
 	 *
 	 * @param string $url 
 	 * @param string $to 
@@ -128,7 +241,7 @@ class Anchor {
 			}	
 		}
 		
-		$route = (object) 'Route';
+		$route = new Anchor();
 		$route->headers = $headers;
 		$route->url = self::parseUrl($url);
 		$route->data = $data;
@@ -139,7 +252,18 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * authorizes a class or parent class to be used as a controller
+	 *
+	 * @param string $controller 
+	 * @return void
+	 */
+	public static function authorize($controller)
+	{
+		array_push(self::$authorized_adapters, $controller);
+	}
+	
+	/**
+	 * runs a callback/closure as run() would
 	 *
 	 * @param string $callback 
 	 * @param string $with_hooks 
@@ -149,7 +273,7 @@ class Anchor {
 	{
 		// merge any incoming data
 		if ($data) {
-			self::$data = (object) array_merge(
+			self::$persistent_data = (object) array_merge(
 				(array) self::getData(),
 				(array) $data
 			);
@@ -206,7 +330,7 @@ class Anchor {
 		self::callHookCallbacks($hooks, 'before', self::getData());
 
 		try {
-			$instance->$short_method(self::$data);
+			$instance->$short_method(self::getData());
 		} catch (Exception $e) {
 			if (!$with_hooks) {
 				throw $e;
@@ -233,7 +357,34 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * returns Anchor objects associated with a callback
+	 *
+	 * @param string $callback 
+	 * @return void
+	 */
+	public static function inspect($callback) 
+	{
+		$matches = array();
+		
+		foreach(self::$routes as $route) {
+			if (!self::matchCallback($route->callback, $callback)) {
+				continue;
+			}
+			if (!self::validateCallback($callback)) {
+				continue;
+			}
+			if (strpos($route->url->subject, '*') === 0) {
+				continue;
+			}
+
+			array_push($matches, $route);
+		}
+		
+		return $matches;
+	}
+	
+	/**
+	 * generates a link from a callback/params string
 	 *
 	 * @param string $callback_key 
 	 * @return void
@@ -244,14 +395,11 @@ class Anchor {
 		$param_names  = preg_split('/(\s+:)|(\s+)|((?<!:):(?!:))/', $callback_key);
 		$callback     = array_shift($param_names);
 		
-		if (!isset($param_names))
 		$param_names_flipped = array_flip($param_names);
 		$url_params = (count($param_names))
 			? array_combine($param_names, $param_values)
 			: array();
 		
-		$best_route = NULL;
-
 		foreach(self::$routes as $route) {
 			$callback_params = array();
 			
@@ -281,7 +429,7 @@ class Anchor {
 			}
 		}
 		
-		$route = $best_route;		
+		$route = $best_route;
 		
 		if (!$route) {
 			throw new AnchorProgrammerException("No route could be found matching the callback. ($callback)");
@@ -291,7 +439,7 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * add a hook to a route
 	 *
 	 * @param string $hook_name 
 	 * @param string $route_callback 
@@ -311,10 +459,20 @@ class Anchor {
 		array_push(self::$hooks, $hook);
 	}
 	
+	/**
+	 * resolve a mock request into a callback as run() would
+	 *
+	 * @param string $url 
+	 * @param string $headers 
+	 * @param string $params 
+	 * @param string $data 
+	 * @param string $offset 
+	 * @return void
+	 */
 	public static function resolve($url, $headers=array(), &$params=array(), &$data=NULL, &$offset=0)
 	{
 		if ($offset > (count(self::$routes) - 1)) {
-			exit('invalid offset');
+			return FALSE;
 		}
 		
 		foreach(self::$routes as $key => $route) {
@@ -367,15 +525,13 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * run the routes for the current request
 	 *
 	 * @return void
 	 */
 	public static function run($exit=TRUE) 
 	{
 		$old_GET = $_GET;
-		
-		print_r(self::getHeaders());
 		
 		while(TRUE) {
 			$_GET = $old_GET;
@@ -414,7 +570,7 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * set a token to replace in a route
 	 *
 	 * @param string $token 
 	 * @param string $conditions 
@@ -425,6 +581,20 @@ class Anchor {
 		$token = strtolower($token);
 		self::$tokens[$token] = $conditions;
 	}
+	
+	/**
+	 * undocumented function
+	 *
+	 * @return void
+	 **/
+	public function getParams()
+	{
+		return array_keys($this->url->params);
+	}
+	
+	// ===============
+	// = Private API =
+	// ===============
 	
 	/**
 	 * undocumented function
@@ -654,25 +824,39 @@ class Anchor {
 		try {
 			$reflected_method = new ReflectionMethod($callback->scalar);
 			
+			// authorize declaring class
+			if (!self::validateAuthorization($reflected_method->getDeclaringClass())) {
+				return FALSE;
+			}
+			
+			// only allow public methods
 			if (!$reflected_method->isPublic()) {
-				exit('method not public');
+				return FALSE;
 			}
 			
+			// don't allow anything that looks like a magic method
 			if (strpos('__', $reflected_method->getName()) === 0) {
-				exit('method looks magic');
+				return FALSE;
 			}
 			
+			// don't allow static methods
 			if ($reflected_method->isStatic()) {
-				exit('method is static');
+				return FALSE;
 			}
 		} catch (ReflectionException $e) {}
 		
 		if (!$reflected_method) {
 			try {
 				$reflected_call = new ReflectionMethod($callback->class . '::__call');
+				
+				// authorize declaring class
+				if (!self::validateAuthorization($reflected_method->getDeclaringClass())) {
+					return FALSE;
+				}
 			
+				// make sure __call is public
 				if (!$reflected_call->isPublic()) {
-					exit('__call not public');
+					return FALSE;
 				}
 			
 			} catch (ReflectionException $e) {}
@@ -683,7 +867,27 @@ class Anchor {
 		}
 		
 		return TRUE;
+	}
+	
+	
+	/**
+	 * validate the authorization of the controller class
+	 *
+	 * @param object $class  a ReflectionClass object
+	 * @return boolean       whether or not the class authorizes
+	 */
+	private static function validateAuthorization($class)
+	{
+		do {
+			foreach(self::$authorized_adapters as $adapter) {
+				$adapter = str_replace('*', '.+', $adapter);
+				if (preg_match('/' . $adapter . '/i', $class->getName())) {
+					return TRUE;
+				}
+			}
+		} while ($class = $class->getParentClass());
 		
+		return FALSE;
 	}
 	
 	/**
@@ -872,7 +1076,7 @@ class Anchor {
 		
 		// validate no dupe symbols
 		if (count($param_names) != count(array_unique($param_names))) {
-			exit('error: dupe names');
+			throw new AnchorProgrammerException('Error: Duplicate param names found.');
 		}
 		
 		foreach($param_symbols as $key => $param_symbol) {
@@ -1028,12 +1232,12 @@ class Anchor {
 	public static function &getData()
 	{
 		// initialize data object
-		if (!is_object(self::$data)) {
-			self::$data = (object) '';
-			unset(self::$data->scalar);
+		if (!is_object(self::$persistent_data)) {
+			self::$persistent_data = (object) '';
+			unset(self::$persistent_data->scalar);
 		}
 		
-		return self::$data;
+		return self::$persistent_data;
 	}
 	
 	/**
@@ -1102,5 +1306,4 @@ class Anchor {
 
 		return reset($output);
 	}
-	
 }
