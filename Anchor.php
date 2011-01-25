@@ -19,8 +19,10 @@ class AnchorDefaultAdapter {
 		if (!headers_sent()) {
 			header("HTTP/1.1 404 Not Found");
 		}
-		echo '<h1>NOT FOUND</h1>';
-		echo "\n\n";
+		$output = "<h1>NOT FOUND</h1>\n";
+		// Chrome will only display the 404 if there
+		// are more than 512 bytes in the response
+		echo str_pad($output, 513, " ");		
 	}
 }
 
