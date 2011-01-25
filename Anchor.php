@@ -14,7 +14,7 @@ class AnchorNotFoundException extends Exception {}
 class AnchorContinueException extends Exception {}
 class AnchorProgrammerException extends Exception {}
 
-class AnchorDefaultAdapter {
+final class AnchorDefaultAdapter {
 	function notFound() {
 		if (!headers_sent()) {
 			header("HTTP/1.1 404 Not Found");
