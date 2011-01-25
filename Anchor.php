@@ -546,7 +546,7 @@ class Anchor {
 				);
 				
 				if ($callable === FALSE) {
-					break;
+					throw new AnchorNotFoundException();
 				}
 				
 				if (self::call($callable, $data)) {
@@ -555,7 +555,6 @@ class Anchor {
 					continue;
 				}
 				
-				throw new AnchorNotFoundException();
 			} catch (AnchorNotFoundException $e) {
 				self::call(self::$not_found_callback);
 				break;
