@@ -571,6 +571,17 @@ class Anchor {
 	}
 	
 	/**
+	 * Set the callback to use when no matching route is found
+	 *
+	 * @param string $callback 
+	 * @return void
+	 */
+	public static function setNotFoundCallback($callback)
+	{
+		self::$not_found_callback = $callback;
+	}
+	
+	/**
 	 * set a token to replace in a route
 	 *
 	 * @param string $token 
