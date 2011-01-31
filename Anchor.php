@@ -304,7 +304,7 @@ class Anchor {
 	{
 		$headers = array();
 		$url     = NULL;
-		$data    = (object) array();
+		$data    = new stdClass;
 		
 		// add closure name aliases, using spl_object_hash internally
 		if ($closure instanceof Closure) {
@@ -333,7 +333,7 @@ class Anchor {
 			}
 			
 			// match url
-			if (preg_match('/^\/.*/', $cond, $matches)) {
+			if (preg_match('#^/.*#', $cond, $matches)) {
 				$url = $matches[0];
 			// match special conditions
 			} else if (preg_match_all('/\[([^\]]+)\=([^\]]+)\]/', $cond, $matches)) {
@@ -388,7 +388,7 @@ class Anchor {
 		// handle closure callables
 		if ($callable instanceof Closure) {
 			$hooks = self::collectHooks($callable);
-			self::callHookCallbacks($hooks, 'init', self::$data);
+			self::callHookCallbacks($hooks, 'init', self::getData());
 			$hooks = self::collectHooks($callable);
 			self::callHookCallbacks($hooks, 'before', self::getData());
 			
@@ -785,7 +785,7 @@ class Anchor {
 	 * @param Exception $exception 
 	 * @return void
 	 */
-	private function callHookCallbacks(&$hooks, $hook, &$data=NULL, &$exception=NULL)
+	private function callHookCallbacks(&$hooks, $hook, $data=NULL, $exception=NULL)
 	{
 		if (isset($hooks[$hook])) {
 			foreach($hooks[$hook] as $hook_obj) {
@@ -1196,11 +1196,11 @@ class Anchor {
 		$url = str_replace('`', '\`', $url);		
 		$url = rtrim($url, '/');
 		
-		if (substr($url->pattern, 0, 1) != '*' && $url->pattern != '*') {
+		if (substr($url, 0, 1) != '*' && $url != '*') {
 			$url = '/' . $url;
 		}
 		
-		$url = preg_replace('/\/+/', '/', $url);
+		$url = preg_replace('#/+#', '/', $url);
 		
 		$url = (object) $url;
 		$url->pattern = $url->scalar;
@@ -1392,8 +1392,7 @@ class Anchor {
 	{
 		// initialize data object
 		if (!is_object(self::$persistent_data)) {
-			self::$persistent_data = (object) '';
-			unset(self::$persistent_data->scalar);
+			self::$persistent_data = new stdClass;
 		}
 		
 		return self::$persistent_data;
