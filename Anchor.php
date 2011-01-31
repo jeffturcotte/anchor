@@ -210,7 +210,7 @@ class Anchor {
 	 * Adds a route to a callback
 	 * 
 	 * 
-	 * The simplest $url is an explict path:
+	 * The simplest $map is an explict path:
 	 * 
 	 *   /users/browse
 	 * 
@@ -226,15 +226,15 @@ class Anchor {
 	 *  - %param will match digits
 	 *  - @param will match letters
 	 * 
-	 * The following $url will match numeric user IDs:
+	 * The following $map will match numeric user IDs:
 	 * 
 	 *   /users/view/%id/preferences
 	 * 
-	 * A * will match any character, but is only valid at the end of a $url:
+	 * A * will match any character, but is only valid at the end of a $map:
 	 * 
 	 *   /resources/%id/*
 	 * 
-	 * A $url can also match specific HTTP headers by using the [header=value]
+	 * A $map can also match specific HTTP headers by using the [header=value]
 	 * syntax before a path name. A space must be present between the closing ]
 	 * and the beginning of the path.
 	 * 
@@ -260,14 +260,14 @@ class Anchor {
 	 *  - json:   [accept-type=application/json]
 	 *  - xml:    [accept-type=text/xml]
 	 * 
-	 * The following $url would match GET requests with the accept-type header
+	 * The following $map would match GET requests with the accept-type header
 	 * of application/json:
 	 * 
 	 *   get json /api/users
 	 * 
 	 * 
 	 * The $callback parameter accepts a callback string for the class
-	 * and method to call when the $url is matched.
+	 * and method to call when the $map is matched.
 	 * 
 	 * The following callback string would call the browse method of the Users
 	 * class:
@@ -282,7 +282,7 @@ class Anchor {
 	 * Both PHP 5.3 namespaces (Namespace\Class) and PHP 5.2-style namespaces
 	 * (Namespace_Class) are detected.
 	 * 
-	 * The namespace, class and method can be infered from the $url by using
+	 * The namespace, class and method can be infered from the $map by using
 	 * the special param names of "namespace", "class" and "method" and then
 	 * a * in the appropriate place in the $callback:
 	 * 
@@ -295,7 +295,7 @@ class Anchor {
 	 *   Anchor::add('/$class/browse', 'Users|Groups::browse');
 	 *   Anchor::add('/users/$method', '*::add|list');
 	 * 
-	 * @param string  $url       The URL to route - see method description for valid syntax
+	 * @param string  $map       The URL to route - see method description for valid syntax
 	 * @param string  $callback  The callback to execute - see method description for valid syntax
 	 * @param Closure $closure   The closure to execute for the route - if this is provided, $callback will be a name to reference the closure by
 	 * @return void
