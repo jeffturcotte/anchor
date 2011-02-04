@@ -14,100 +14,113 @@ class AnchorNotFoundException extends Exception {}
 class AnchorContinueException extends Exception {}
 class AnchorProgrammerException extends Exception {}
 
-class AnchorDefaultAdapter {
-	function notFound() {
+final class AnchorDefaultAdapter {
+	function notFound()
+	{
 		if (!headers_sent()) {
 			header("HTTP/1.1 404 Not Found");
 		}
-		echo '<h1>NOT FOUND</h1>';
-		echo "\n\n";
+		$output = "<h1>NOT FOUND</h1>\n";
+		// Chrome will only display the 404 if there
+		// are more than 512 bytes in the response
+		echo str_pad($output, 513, " ");		
 	}
 }
 
 class Anchor {
 	/**
-	 * undocumented variable
+	 * The parsed URL from Anchor::parseURL() that is matched against
 	 *
-	 * @var object
+	 * @var stdClass
 	 */
 	private $url;
 	
 	/**
-	 * undocumented variable
+	 * An array of headers to match against
 	 *
 	 * @var array
 	 */
 	private $headers;
 
 	/**
-	 * undocumented variable
+	 * The parsed callback from Anchor::parseCallback() that is executed upon
+	 * a successful match of the $url
 	 *
-	 * @var object
+	 * @var stdClass
 	 */
 	private $callback;
 
 	/**
-	 * undocumented variable
+	 * The closure to execute, if this route's callback was a closure
 	 *
-	 * @var object
+	 * @var Closure
 	 */
 	private $closure;
 
 	/**
-	 * undocumented variable
+	 * The data object to pass to the callback - this will only ever contain a
+	 * value if the callback is a closure, in which case this will be the Closure
 	 *
 	 * @var object
 	 */
 	private $data;
 	
 	/**
-	 * undocumented variable
+	 * An array of class names that can be used as callbacks with Anchor
+	 * 
+	 * This helps provide security by creating a whitelist of the valid
+	 * adapter classes when using parts of a URL to create the name of the
+	 * callback to execute.
 	 *
 	 * @var array
 	 */
 	private static $authorized_adapters = array();
 	
 	/**
-	 * undocumented variable
+	 * A stack containing all of the callbacks that have been run
+	 * 
+	 * The most recently called callback will be at the end of the array.
 	 *
 	 * @var array
 	 */
 	private static $active_callback = array();
 
 	/**
-	 * undocumented variable
+	 * An array used internally for caching simple, deterministic values
 	 *
 	 * @var array
 	 */
 	private static $cache = array(
-		'find' => array(),
+		'find'         => array(),
 		'underscorize' => array(),
-		'camelize' => array()
+		'camelize'     => array()
 	);
 	
 	/**
-	 * undocumented variable
+	 * An associative array with keys being explicit names give to closures
+	 * and the values being the internal identifier
 	 *
 	 * @var array
 	 */
 	private static $closure_aliases = array();
 	
 	/**
-	 * undocumented variable
+	 * The persistent data that is passed to the currently executing callback
 	 *
-	 * @var boolean
+	 * @var stdClass
 	 */
 	private static $persistent_data = NULL;
 	
 	/**
-	 * undocumented variable
+	 * An array of stdClass objects representing the callbacks to be executed
+	 * for each hook/URL combination
 	 *
 	 * @var array
 	 */
 	private static $hooks = array();
 	
 	/**
-	 * undocumented variable
+	 * Shortcut token for use when matching against HTTP headers in URLs
 	 *
 	 * @var array
 	 */
@@ -122,28 +135,28 @@ class Anchor {
 	);
 	
 	/**
-	 * undocumented variable
+	 * The callback to execute when a matching route is not found
 	 *
 	 * @var string
 	 */
 	private static $not_found_callback = 'AnchorDefaultAdapter::notFound';
 	
 	/**
-	 * undocumented variable
+	 * All of the defined routes, each of which is an Anchor object
 	 *
 	 * @var array
 	 */
 	private static $routes = array();
 	
 	/**
-	 * undocumented variable
+	 * The path part of the URL for the current request
 	 *
 	 * @var string
 	 */
 	private static $request_path = NULL;
 	
 	/**
-	 * undocumented variable
+	 * The symbols for params and what characters such params should match
 	 *
 	 * @var array
 	 */
@@ -155,7 +168,10 @@ class Anchor {
 	);
 	
 	/**
-	 * undocumented variable
+	 * The special param names to use when building a callback string from
+	 * a URL.
+	 * 
+	 * The key is the callback string part and the value is the param name.
 	 *
 	 * @var array
 	 */
@@ -166,7 +182,10 @@ class Anchor {
 	);
 	
 	/**
-	 * undocumented variable
+	 * The callbacks to use to format parts of a callback string
+	 * 
+	 * The key is the callback string part, the value is the callback to pass
+	 * the string to.
 	 *
 	 * @var array
 	 */
@@ -188,17 +207,104 @@ class Anchor {
 	// ==============
 	
 	/**
-	 * adds a route
+	 * Adds a route to a callback
+	 * 
+	 * 
+	 * The simplest $map is an explict path:
+	 * 
+	 *   /users/browse
+	 * 
+	 * Parameters may be pulled out of the URL by specifying a :param_name
+	 * 
+	 *   /users/view/:id
+	 * 
+	 * There are different sets of values that params can match, based on the
+	 * first character of the param:
+	 * 
+	 *  - :param will match anything but a slash
+	 *  - $param will match any valid PHP identifier name, i.e. letters, numbers and underscore
+	 *  - %param will match digits
+	 *  - @param will match letters
+	 * 
+	 * The following $map will match numeric user IDs:
+	 * 
+	 *   /users/view/%id/preferences
+	 * 
+	 * A * will match any character, but is only valid at the end of a $map:
+	 * 
+	 *   /resources/%id/*
+	 * 
+	 * A $map can also match specific HTTP headers by using the [header=value]
+	 * syntax before a path name. A space must be present between the closing ]
+	 * and the beginning of the path.
+	 * 
+	 *   [accept-type=application/json] /api/users/list
+	 * 
+	 * The following headers are supported:
+	 * 
+	 *  - request-method
+	 *  - accept-type
+	 *  - accept-language
+	 * 
+	 * Matching of headers is done by comparing strings in a case-insensitive
+	 * manner. The accept-type and accept-language headers will only match on
+	 * the value with the highest q value.
+	 * 
+	 * The following predefined shortcuts have been set up for matching headers:
+	 * 
+	 *  - get:    [request-method=get]
+	 *  - post:   [request-method=post]
+	 *  - put:    [request-method=put]
+	 *  - delete: [request-method=delete]
+	 *  - html:   [accept-type=text/html]
+	 *  - json:   [accept-type=application/json]
+	 *  - xml:    [accept-type=text/xml]
+	 * 
+	 * The following $map would match GET requests with the accept-type header
+	 * of application/json:
+	 * 
+	 *   get json /api/users
+	 * 
+	 * 
+	 * The $callback parameter accepts a callback string for the class
+	 * and method to call when the $map is matched.
+	 * 
+	 * The following callback string would call the browse method of the Users
+	 * class:
+	 * 
+	 *   Users::browse
 	 *
-	 * @param string $url 
-	 * @param string $to 
-	 * @param string $closure 
+	 * In addition to a class and method, it is also possible to specify the
+	 * namespace:
+	 * 
+	 *   Controllers\Users::browse
+	 * 
+	 * Both PHP 5.3 namespaces (Namespace\Class) and PHP 5.2-style namespaces
+	 * (Namespace_Class) are detected.
+	 * 
+	 * The namespace, class and method can be infered from the $map by using
+	 * the special param names of "namespace", "class" and "method" and then
+	 * a * in the appropriate place in the $callback:
+	 * 
+	 *   Anchor::add('/$namespace/$class/$method', '*_*::*');
+	 * 
+	 * In addition to allowing any value for part of the callback, a specific
+	 * list of namespaces, classes or method can be specified by separating
+	 * them with a pipe:
+	 * 
+	 *   Anchor::add('/$class/browse', 'Users|Groups::browse');
+	 *   Anchor::add('/users/$method', '*::add|list');
+	 * 
+	 * @param string  $map       The URL to route - see method description for valid syntax
+	 * @param string  $callback  The callback to execute - see method description for valid syntax
+	 * @param Closure $closure   The closure to execute for the route - if this is provided, $callback will be a name to reference the closure by
 	 * @return void
 	 */
-	public function add($map, $callback, $closure=NULL) {
+	public function add($map, $callback, $closure=NULL)
+	{
 		$headers = array();
 		$url     = NULL;
-		$data    = (object) array();
+		$data    = new stdClass;
 		
 		// add closure name aliases, using spl_object_hash internally
 		if ($closure instanceof Closure) {
@@ -227,7 +333,7 @@ class Anchor {
 			}
 			
 			// match url
-			if (preg_match('/^\/.*/', $cond, $matches)) {
+			if (preg_match('#^/.*#', $cond, $matches)) {
 				$url = $matches[0];
 			// match special conditions
 			} else if (preg_match_all('/\[([^\]]+)\=([^\]]+)\]/', $cond, $matches)) {
@@ -242,19 +348,19 @@ class Anchor {
 		}
 		
 		$route = new Anchor();
-		$route->headers = $headers;
-		$route->url = self::parseUrl($url);
-		$route->data = $data;
+		$route->headers  = $headers;
+		$route->url      = self::parseUrl($url);
+		$route->data     = $data;
 		$route->callback = self::parseCallback($callback);
-		$route->closure = $closure;
+		$route->closure  = $closure;
 		
 		array_push(self::$routes, $route);
 	}
 	
 	/**
-	 * authorizes a class or parent class to be used as a controller
+	 * Authorizes a class or parent class to be used as a controller
 	 *
-	 * @param string $controller 
+	 * @param string $controller  The class name to authorize as a controller
 	 * @return void
 	 */
 	public static function authorize($controller)
@@ -263,11 +369,11 @@ class Anchor {
 	}
 	
 	/**
-	 * runs a callback/closure as run() would
+	 * Runs a callback/closure as run() would
 	 *
-	 * @param string $callback 
-	 * @param string $with_hooks 
-	 * @return void
+	 * @param string|Closure  $callable  The string callback or closure to call
+	 * @param stdClass        $data      The persistent data object that is passed to $callable
+	 * @return boolean  If $callable was successfully executed
 	 */
 	public static function call($callable, $data=NULL)
 	{
@@ -282,7 +388,7 @@ class Anchor {
 		// handle closure callables
 		if ($callable instanceof Closure) {
 			$hooks = self::collectHooks($callable);
-			self::callHookCallbacks($hooks, 'init', self::$data);
+			self::callHookCallbacks($hooks, 'init', self::getData());
 			$hooks = self::collectHooks($callable);
 			self::callHookCallbacks($hooks, 'before', self::getData());
 			
@@ -357,10 +463,10 @@ class Anchor {
 	}
 	
 	/**
-	 * returns Anchor objects associated with a callback
+	 * Returns Anchor objects associated with a callback
 	 *
-	 * @param string $callback 
-	 * @return void
+	 * @param string $callback  The callback to return the routes for
+	 * @return array  An array of Anchor instances
 	 */
 	public static function inspect($callback) 
 	{
@@ -384,12 +490,18 @@ class Anchor {
 	}
 	
 	/**
-	 * generates a link from a callback/params string
+	 * Generates a link from a callback/params string
+	 * 
+	 * Example usage, without or with : before param name:
+	 * 
+	 *   Anchor::find('Users::view id');
+	 *   Anchor::find('Users::view :id');
 	 *
-	 * @param string $callback_key 
-	 * @return void
+	 * @param string $callback_key  A string containing a callback and (optionally) param names - params should be separated by space and may begin with a :
+	 * @return string  The matching URL
 	 */
-	public static function find($callback_key) {
+	public static function find($callback_key)
+	{
 		$param_values = func_get_args();
 		$callback_key = trim(array_shift($param_values));
 		$param_names  = preg_split('/(\s+:)|(\s+)|((?<!:):(?!:))/', $callback_key);
@@ -439,11 +551,11 @@ class Anchor {
 	}
 	
 	/**
-	 * add a hook to a route
+	 * Adds a callback to be called at a pre-defined hook during the execution of a specific route callback
 	 *
-	 * @param string $hook_name 
-	 * @param string $route_callback 
-	 * @param string $hook_callback 
+	 * @param string $hook_name       The hook to attach the callback to
+	 * @param string $route_callback  The route callback to attach the callback to
+	 * @param string $hook_callback   The callback to attach
 	 * @return void
 	 */
 	public static function hook($hook_name, $route_callback, $hook_callback) 
@@ -460,14 +572,14 @@ class Anchor {
 	}
 	
 	/**
-	 * resolve a mock request into a callback as run() would
+	 * Returns a callback that matches the URL, headers and params passed
 	 *
-	 * @param string $url 
-	 * @param string $headers 
-	 * @param string $params 
-	 * @param string $data 
-	 * @param string $offset 
-	 * @return void
+	 * @param string   $url      The URL to match against
+	 * @param array    $headers  An associative array of headers to match against - keys must be lower case
+	 * @param array    &$params  The GET parameters to match against - param mapping from a route may affect values in this array
+	 * @param stdClass &$data    The data from the route, if one is matched
+	 * @param integer  $offset   The index in the array of routes to restart from - this allows resolving multiple times in sequence
+	 * @return FALSE|stdClass  Returns FALSE if no matching callback was found, otherwise
 	 */
 	public static function resolve($url, $headers=array(), &$params=array(), &$data=NULL, &$offset=0)
 	{
@@ -525,8 +637,9 @@ class Anchor {
 	}
 	
 	/**
-	 * run the routes for the current request
+	 * Run the routes for the current request
 	 *
+	 * @param  boolean $exit  If execution of PHP should stop after routing
 	 * @return void
 	 */
 	public static function run($exit=TRUE) 
@@ -554,6 +667,10 @@ class Anchor {
 				} else {
 					continue;
 				}
+<<<<<<< HEAD
+=======
+				
+>>>>>>> 3d200d179cff83509ff6c81b049f5b27074ff019
 			} catch (AnchorNotFoundException $e) {
 				self::call(self::$not_found_callback);
 				break;
@@ -568,10 +685,21 @@ class Anchor {
 	}
 	
 	/**
-	 * set a token to replace in a route
+	 * Set the callback to use when no matching route is found
 	 *
-	 * @param string $token 
-	 * @param string $conditions 
+	 * @param string $callback  The callback to call
+	 * @return void
+	 */
+	public static function setNotFoundCallback($callback)
+	{
+		self::$not_found_callback = $callback;
+	}
+	
+	/**
+	 * Set a token to use as shorthand for header conditions in in a route
+	 *
+	 * @param string $token       The token to create
+	 * @param string $conditions  The header conditions for the token to represent
 	 * @return void
 	 */
 	public static function setToken($token, $conditions)
@@ -581,9 +709,9 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * Returns the params for the current route
 	 *
-	 * @return void
+	 * @return array  The param names for the current route
 	 **/
 	public function getParams()
 	{
@@ -598,7 +726,7 @@ class Anchor {
 	 * undocumented function
 	 *
 	 * @param object $route 
-	 * @param string $params 
+	 * @param array  &$params 
 	 * @return void
 	 */
 	private static function buildCallback($route, &$params) 
@@ -656,11 +784,11 @@ class Anchor {
 	 *
 	 * @param string $hooks 
 	 * @param string $hook 
-	 * @param string $data 
-	 * @param string $exception 
+	 * @param stdClass  $data 
+	 * @param Exception $exception 
 	 * @return void
 	 */
-	private function callHookCallbacks(&$hooks, $hook, &$data=NULL, &$exception=NULL)
+	private function callHookCallbacks(&$hooks, $hook, $data=NULL, $exception=NULL)
 	{
 		if (isset($hooks[$hook])) {
 			foreach($hooks[$hook] as $hook_obj) {
@@ -923,11 +1051,14 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * Indicates if a set of header conditions matches the headers
+	 * 
+	 * Each conditions is tested against the headers by comparing the two
+	 * in a case-insensitive manner.
 	 *
-	 * @param string $conditions 
-	 * @param string $headers 
-	 * @return void
+	 * @param array  $conditions  An associative array of {lowercase header name} => {value}
+	 * @param array  $headers     An associative array of {lowercase header name} => {value}
+	 * @return boolean  If each condition matches a header
 	 */
 	private static function matchHeaders($conditions, $headers=array())
 	{
@@ -966,10 +1097,18 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * Parses a string callback into an object representation
+	 * 
+	 * The object will have the following attributes:
+	 *  - pattern:      The PCRE regex patterns to match callbacks against
+	 *  - method:       The full callback, including namespace, short_class and short_method
+	 *  - class:        The namespace and short_class (or class name)
+	 *  - namespace:    The class namespace, if applicable
+	 *  - short_class:  The class name
+	 *  - short_method: The method name
 	 *
 	 * @param string|object $callback 
-	 * @return object
+	 * @return stdClass  The parsed callback
 	 */
 	private static function parseCallback($callback) 
 	{
@@ -1029,10 +1168,19 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * Parses a URL into an object
+	 * 
+	 * The object will have the following attributes:
+	 *  - pattern:  The PCRE regex to match against
+	 *  - subject:  The original text of the URL, with trailing * and / removed
+	 *  - params:   An associative array of {param name} => {object with attributes}:
+	 *    - symbol:  The full type and name, e.g. :id
+	 *    - type:    The type, e.g. :
+	 *    - name:    The name, e.g. id
+	 *  - param_aliases: An associative array to map param names {source param} => {destination param}
 	 *
-	 * @param string $url 
-	 * @return void
+	 * @param  string $url  The URL to parse
+	 * @return stdClass  An object representing the parsed URL
 	 */
 	private static function parseUrl($url) 
 	{
@@ -1051,11 +1199,11 @@ class Anchor {
 		$url = str_replace('`', '\`', $url);		
 		$url = rtrim($url, '/');
 		
-		if (substr($url->pattern, 0, 1) != '*' && $url->pattern != '*') {
+		if (substr($url, 0, 1) != '*' && $url != '*') {
 			$url = '/' . $url;
 		}
 		
-		$url = preg_replace('/\/+/', '/', $url);
+		$url = preg_replace('#/+#', '/', $url);
 		
 		$url = (object) $url;
 		$url->pattern = $url->scalar;
@@ -1080,8 +1228,8 @@ class Anchor {
 		foreach($param_symbols as $key => $param_symbol) {
 			$param = (object) $param_names[$key];
 			$param->symbol = $param_symbol;
-			$param->type = $param_types[$key];
-			$param->name = $param_names[$key];
+			$param->type   = $param_types[$key];
+			$param->name   = $param_names[$key];
 			$url->params[$param->name] = $param;
 			
 			$replacement = sprintf(
@@ -1216,32 +1364,47 @@ class Anchor {
 		return self::camelize($string, TRUE);
 	}
 	
+	/**
+	 * Returns the most recently run callback
+	 * 
+	 * @return callable  The most recently run callback
+	 */
 	private static function getActiveCallback()
 	{
 		return end(self::$active_callback);
 	}
 	
+	/**
+	 * Adds a callback to the stack of executing callbacks
+	 * 
+	 * @param callable $callback  The callback being executed
+	 * @return callable  The $callback
+	 */
 	private static function setActiveCallback($callback)
 	{
 		array_push(self::$active_callback, $callback);
 		return $callback;
 	}
 	
-	public static function &getData()
+	/**
+	 * Returns the data object that is passed between callbacks
+	 * 
+	 * @return stdClass  The data object
+	 */
+	public static function getData()
 	{
 		// initialize data object
 		if (!is_object(self::$persistent_data)) {
-			self::$persistent_data = (object) '';
-			unset(self::$persistent_data->scalar);
+			self::$persistent_data = new stdClass;
 		}
 		
 		return self::$persistent_data;
 	}
 	
 	/**
-	 * undocumented function
+	 * Returns the request URI minus the query string
 	 *
-	 * @return void
+	 * @return string  The request path
 	 */
 	private static function getRequestPath()
 	{
@@ -1255,9 +1418,12 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * Returns simplified up headers for matching during the routing process
+	 * 
+	 * Most HTTP headers are returned verbatim, but Accept-* headers are parsed
+	 * selecting the value with the highest Q.
 	 *
-	 * @return void
+	 * @return array  An associative array of {lower case header name} => {simplified header value}
 	 */
 	private static function getHeaders()
 	{
