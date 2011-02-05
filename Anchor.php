@@ -667,10 +667,6 @@ class Anchor {
 				} else {
 					continue;
 				}
-<<<<<<< HEAD
-=======
-				
->>>>>>> 3d200d179cff83509ff6c81b049f5b27074ff019
 			} catch (AnchorNotFoundException $e) {
 				self::call(self::$not_found_callback);
 				break;
@@ -935,10 +931,17 @@ class Anchor {
 	}
 	
 	/**
-	 * undocumented function
+	 * Validate that the callback meets the following criteria:
+	 * 
+	 *  - Authorized to be run. See validateAuthorization
+	 *  - Is a public method
+	 *  - Is an instance method
+	 *  - Does not start with double underscore i.e. looks like a magic method 
+	 * 
+	 * or that that callbacks class is authorized and has a public __call method.
 	 *
-	 * @param string $callback 
-	 * @return void
+	 * @param string $callback  A callback string
+	 * @return boolean  Whether or not the callback validates
 	 */
 	private static function validateCallback($callback)
 	{
@@ -960,13 +963,13 @@ class Anchor {
 				return FALSE;
 			}
 			
-			// don't allow anything that looks like a magic method
-			if (strpos('__', $reflected_method->getName()) === 0) {
+			// don't allow static methods
+			if ($reflected_method->isStatic()) {
 				return FALSE;
 			}
 			
-			// don't allow static methods
-			if ($reflected_method->isStatic()) {
+			// don't allow anything that looks like a magic method
+			if (strpos('__', $reflected_method->getName()) === 0) {
 				return FALSE;
 			}
 		} catch (ReflectionException $e) {}
