@@ -20,6 +20,7 @@ final class AnchorDefaultAdapter {
 		if (!headers_sent()) {
 			header("HTTP/1.1 404 Not Found");
 		}
+		
 		$output = "<h1>NOT FOUND</h1>\n";
 		// Chrome will only display the 404 if there
 		// are more than 512 bytes in the response
@@ -58,12 +59,11 @@ class Anchor {
 	private $closure;
 
 	/**
-	 * The data object to pass to the callback - this will only ever contain a
-	 * value if the callback is a closure, in which case this will be the Closure
+	 * A stack containing all of the data objects
 	 *
-	 * @var object
+	 * @var array
 	 */
-	private $data;
+	private static $active_data = array();
 	
 	/**
 	 * An array of class names that can be used as callbacks with Anchor
@@ -74,7 +74,9 @@ class Anchor {
 	 *
 	 * @var array
 	 */
-	private static $authorized_adapters = array();
+	private static $authorized_adapters = array(
+		'AnchorDefaultAdapter'
+	);
 	
 	/**
 	 * A stack containing all of the callbacks that have been run
@@ -129,7 +131,7 @@ class Anchor {
 		'post'   => '[request-method=post]',
 		'put'    => '[request-method=put]',
 		'delete' => '[request-method=delete]',
-		'html'   => '[accept-type=text/html]',
+		'html'   => '[accept-type=application/xml]',
 		'json'   => '[accept-type=application/json]',
 		'xml'    => '[accept-type=text/xml]'
 	);
@@ -368,98 +370,83 @@ class Anchor {
 		array_push(self::$authorized_adapters, $controller);
 	}
 	
+	private static function dispatchCallable($callable) {
+		if ($callable instanceof Closure) {
+			call_user_func_array(
+				$callable,
+				array(self::getActiveData())
+			);
+			return TRUE;
+		}
+
+		$callback = self::parseCallback($callable);
+
+		$class = $callback->class;
+		$short_method = $callback->short_method;
+		$instance = new $class();
+		$instance->$short_method(self::getActiveData());
+		return TRUE;
+	}
+	
 	/**
 	 * Runs a callback/closure as run() would
 	 *
 	 * @param string|Closure  $callable  The string callback or closure to call
 	 * @param stdClass        $data      The persistent data object that is passed to $callable
-	 * @return boolean  If $callable was successfully executed
+	 * @return boolean        If $callable was successfully executed
 	 */
 	public static function call($callable, $data=NULL)
 	{
 		// merge any incoming data
-		if ($data) {
-			self::$persistent_data = (object) array_merge(
-				(array) self::getData(),
-				(array) $data
-			);
-		} 
+		if ($data === NULL) {
+			$data = (object) '';
+			unset($data->scalar);
+		}
 		
-		// handle closure callables
-		if ($callable instanceof Closure) {
+		if (!($callable instanceof Closure)) {
+			if (!self::validateCallback($callable)) {
+				return FALSE;
+			}
+		}
+		
+		self::pushActiveData($data);
+		self::pushActiveCallback($callable);
+		
+		try {
 			$hooks = self::collectHooks($callable);
-			self::callHookCallbacks($hooks, 'init', self::getData());
+			self::callHookCallbacks($hooks, 'init', self::getActiveData());
 			$hooks = self::collectHooks($callable);
-			self::callHookCallbacks($hooks, 'before', self::getData());
-			
+			self::callHookCallbacks($hooks, 'before', self::getActiveData());
+		
 			try {
-				call_user_func_array(
-					$callable,
-					array(self::getData())
-				);
+				self::dispatchCallable($callable);
 			} catch (Exception $e) {
 				$exception = new ReflectionClass($e);
-				
+			
 				do {
 					$hook_name = "catch " . $exception->getName();
-					if (self::callHookCallbacks($hooks, $hook_name, self::getData(), $e)) {
+					if (self::callHookCallbacks($hooks, $hook_name, self::getActiveData(), $e)) {
 						break;
 					}
 				} while ($exception = $exception->getParentClass());
-				
-	 			if (!$exception) { throw $e; }
-			}
 			
-			self::callHookCallbacks($hooks, 'after', self::getData());
-			self::callHookCallbacks($hooks, 'final', self::getData());
-		
-			return TRUE;
-		} 
-		
-		// handle callback callables
-		if (!self::validateCallback($callable)) {
-			return FALSE;
-		}
-		
-		$callback = self::parseCallback($callable);
-
-		self::setActiveCallback($callback);
-
-		$hooks = self::collectHooks($callable);
-		self::callHookCallbacks($hooks, 'init', self::getData());
-		$hooks = self::collectHooks($callable);
-
-		$class = $callback->class;
-		$short_method = $callback->short_method;
-		$instance = new $class();
-
-		self::callHookCallbacks($hooks, 'before', self::getData());
-
-		try {
-			$instance->$short_method(self::getData());
-		} catch (Exception $e) {
-			if (!$with_hooks) {
-				throw $e;
-			}
-
-			$exception = new ReflectionClass($e);
-
-			do {
-				$hook_name = "catch " . $exception->getName();
-				if (self::callHookCallbacks($hooks, $hook_name, self::getData(), $e)) {
-					break;
+	 			if (!$exception) { 
+					self::popActiveData();
+					self::popActiveCallback();
+					throw $e; 
 				}
-			} while ($exception = $exception->getParentClass());
-
- 			if (!$exception) {
-				throw $e;
 			}
-		}
-
-		self::callHookCallbacks($hooks, 'after', self::getData());
-		self::callHookCallbacks($hooks, 'final', self::getData());
 		
-		return TRUE;
+			self::callHookCallbacks($hooks, 'after', self::getActiveData());
+			self::callHookCallbacks($hooks, 'final', self::getActiveData());
+	
+			self::popActiveCallback();
+			return self::popActiveData();
+		} catch (Exception $e) {
+			self::popActiveCallback();
+			self::popActiveData();
+			throw $e;
+		}
 	}
 	
 	/**
@@ -468,25 +455,43 @@ class Anchor {
 	 * @param string $callback  The callback to return the routes for
 	 * @return array  An array of Anchor instances
 	 */
-	public static function inspect($callback) 
+	public static function inspect($callback, $single=NULL) 
 	{
 		$matches = array();
+		
+		if (!self::validateCallback($callback)) {
+			return $matches;
+		}
 		
 		foreach(self::$routes as $route) {
 			if (!self::matchCallback($route->callback, $callback)) {
 				continue;
 			}
-			if (!self::validateCallback($callback)) {
-				continue;
-			}
 			if (strpos($route->url->subject, '*') === 0) {
 				continue;
 			}
-
+			
+			if ($single) { 
+				return $route;
+			}
+			
 			array_push($matches, $route);
 		}
 		
 		return $matches;
+	}
+	
+	public static function make()
+	{
+		$args = func_get_args();
+		$text = array_shift($args);
+		$link = call_user_func_array(__CLASS__.'::find', $args);
+		
+		if ($text === NULL) {
+			$text = $link;
+		}
+		
+		return sprintf('<a href="%s">%s</a>', $link, $text);
 	}
 	
 	/**
@@ -507,10 +512,19 @@ class Anchor {
 		$param_names  = preg_split('/(\s+:)|(\s+)|((?<!:):(?!:))/', $callback_key);
 		$callback     = array_shift($param_names);
 		
-		$param_names_flipped = array_flip($param_names);
-		$url_params = (count($param_names))
-			? array_combine($param_names, $param_values)
+		if (isset(self::$closure_aliases[$callback])) {
+			$callback = self::$closure_aliases[$callback];
+		}
+		
+		$param_names_count = count($param_names);		
+		$param_values = array_slice($param_values, 0, $param_names_count);
+		$param_values = array_pad($param_values, $param_names_count, '');
+		
+		$url_params = ($param_names_count) 
+			? array_combine($param_names, $param_values) 
 			: array();
+		
+		$param_names_flipped = array_flip($param_names);
 		
 		foreach(self::$routes as $route) {
 			$callback_params = array();
@@ -526,7 +540,7 @@ class Anchor {
 				$diff   = count(array_diff_key($route->url->params, $params));
 				
 				$is_best = (
-					$best_route === NULL ||
+					!isset($best_route) ||
 					$low_dist > $dist && $low_diff >= $diff ||
 					$low_dist >= $dist && $high_sect < $sect ||
 					$low_dist >= $dist && $high_sect <= $sect && $low_diff > $diff
@@ -534,20 +548,19 @@ class Anchor {
 				
 				if ($is_best) {
 					$best_route = $route;
-					$low_dist = $dist;
-					$high_sect = $sect;
-					$low_diff = $diff;
+					$low_dist   = $dist;
+					$high_sect  = $sect;
+					$low_diff   = $diff;
 				}
 			}
 		}
 		
-		$route = $best_route;
-		
-		if (!$route) {
-			throw new AnchorProgrammerException("No route could be found matching the callback. ($callback)");
+		if (!isset($best_route)) {
+			trigger_error("No route could be found matching the callback ($callback)", E_USER_WARNING);
+			return '#';
 		}
 		
-		return self::buildUrl($route, $params);
+		return self::buildUrl($best_route, $params);
 	}
 	
 	/**
@@ -602,7 +615,7 @@ class Anchor {
 			if (!self::matchUrl($route->url, $url, $params)) {
 				continue;
 			}
-			
+						
 			// match and map param aliases
 			foreach($route->url->param_aliases as $from => $to) {
 				if (!isset($params[$from])) {
@@ -636,6 +649,20 @@ class Anchor {
 		return FALSE;
 	}
 	
+	public static function reveal($piece='method')
+	{
+		if (!($callback = self::getActiveCallback())) {
+			return NULL;
+		}
+		if ($callback instanceof Closure) {
+			return $callback;
+		}
+		if (!in_array($piece, array('method', 'class', 'namespace', 'short_class', 'short_method'))) {
+			return NULL;
+		}
+		return $callback->$piece;
+	}
+	
 	/**
 	 * Run the routes for the current request
 	 *
@@ -645,6 +672,7 @@ class Anchor {
 	public static function run($exit=TRUE) 
 	{
 		$old_GET = $_GET;
+		$offset = 0;
 		
 		while(TRUE) {
 			$_GET = $old_GET;
@@ -665,6 +693,7 @@ class Anchor {
 				if (self::call($callable, $data)) {
 				 	break;
 				} else {
+					$offset++;
 					continue;
 				}
 			} catch (AnchorNotFoundException $e) {
@@ -686,10 +715,14 @@ class Anchor {
 	 * @param string $callback  The callback to call
 	 * @return void
 	 */
-	public static function setNotFoundCallback($callback)
+	public static function configureNotFoundCallback($callback)
 	{
 		self::$not_found_callback = $callback;
 	}
+	
+	public static function configureRequestPath($request_path) {}
+	public static function configureLegacyNamespacing() {}
+	public static function configureFragmentRouting() {}
 	
 	/**
 	 * Set a token to use as shorthand for header conditions in in a route
@@ -698,11 +731,12 @@ class Anchor {
 	 * @param string $conditions  The header conditions for the token to represent
 	 * @return void
 	 */
-	public static function setToken($token, $conditions)
+	public static function configureToken($token, $conditions)
 	{
 		$token = strtolower($token);
 		self::$tokens[$token] = $conditions;
 	}
+	
 	
 	/**
 	 * Returns the params for the current route
@@ -711,8 +745,14 @@ class Anchor {
 	 **/
 	public function getParams()
 	{
-		return array_keys($this->url->params);
+		$params = array_diff(
+			array_keys($this->url->params),
+			self::$callback_param_names
+		);
+		return $params;
 	}
+	
+	
 	
 	// ===============
 	// = Private API =
@@ -788,10 +828,13 @@ class Anchor {
 	{
 		if (isset($hooks[$hook])) {
 			foreach($hooks[$hook] as $hook_obj) {
-				call_user_func_array(
-					self::resolveCallback($hook_obj->callback),
-					array($data, $exception)
-				);
+				$callback = self::resolveCallback($hook_obj->callback);
+				
+				if (!is_callable($callback)) {
+					continue;
+				}
+				
+				call_user_func_array($callback, array($data, $exception));
 			}
 			return TRUE;
 		}
@@ -854,7 +897,7 @@ class Anchor {
 		$hooks = array();
 		
 		foreach(self::$hooks as $hook) {
-			if (self::matchCallback($hook->route_callback, $callable)) {
+			if (self::matchDerivativeCallback($hook->route_callback, $callable)) {
 				if (!isset($hooks[$hook->hook])) {
 					$hooks[$hook->hook] = array();
 				}
@@ -895,6 +938,15 @@ class Anchor {
 	private static function buildUrl($route, &$params)
 	{
 		$anchor = $route->url->subject;
+		
+		if ($route->closure) {
+			unset($params[self::$callback_param_names['short_method']]);
+		}
+		
+		if (count($route->url->params) > count($params)) {
+			trigger_error('The required params to build the URL were not supplied', E_USER_WARNING);
+			return '#';
+		}
 		
 		// replace all url param symbols with callback values
 		foreach($route->url->params as $name => $param) {
@@ -969,7 +1021,7 @@ class Anchor {
 			}
 			
 			// don't allow anything that looks like a magic method
-			if (strpos('__', $reflected_method->getName()) === 0) {
+			if (strpos($reflected_method->getName(), '__') === 0) {
 				return FALSE;
 			}
 		} catch (ReflectionException $e) {}
@@ -1010,7 +1062,7 @@ class Anchor {
 		do {
 			foreach(self::$authorized_adapters as $adapter) {
 				$adapter = str_replace('*', '.+', $adapter);
-				if (preg_match('/' . $adapter . '/i', $class->getName())) {
+				if (preg_match('/^' . $adapter . '$/i', $class->getName())) {
 					return TRUE;
 				}
 			}
@@ -1050,6 +1102,27 @@ class Anchor {
 			}
 			return TRUE;
 		}
+		return FALSE;
+	}
+	
+	private static function matchDerivativeCallback($parsed_callback, $callback_string)
+	{
+		if (!preg_match($parsed_callback->parent_pattern, $callback_string)) {
+			return FALSE;
+		}
+		
+		if (in_array('*', $parsed_callback->parent_options)) {
+			return TRUE;
+		}
+
+		$callback = self::parseCallback($callback_string);
+		
+		foreach($parsed_callback->parent_options as $parent_class) {
+			if (is_subclass_of($callback->short_class, $parent_class)) {
+				return TRUE;
+			}
+		}
+		
 		return FALSE;
 	}
 	
@@ -1144,23 +1217,29 @@ class Anchor {
 		
 		// create callback pattern
 		$pattern = '(?P<' . self::$callback_param_names['short_method'] . '>' . str_replace('*', '.+', $callback->short_method) . ')';
+		$derivative_pattern = $pattern;
 		
 		if ($callback->short_class) {
 			$pattern = '(?P<' . self::$callback_param_names['short_class'] . '>' . str_replace('*', '.+', $callback->short_class) . ')::' . $pattern;
+			$derivative_pattern = '(?P<' . self::$callback_param_names['short_class'] . '>.+)::' . $derivative_pattern;
 		}
 		
 		$separator = str_replace('\\', '\\\\', self::$namespace_separator);
 		
 		if ($callback->namespace) {
 			$pattern = '(?P<' . self::$callback_param_names['namespace'] . '>' . str_replace('*', '.+', $callback->namespace) . ')' . $separator . $pattern;
+			$derivative_pattern = '(?P<' . self::$callback_param_names['namespace'] . '>' . str_replace('*', '.+', $callback->namespace) . ')' . $separator . $derivative_pattern;
 		}
 		
 		$callback->pattern = '/^' . $pattern . '$/';
+		$callback->parent_pattern = '/^' . $derivative_pattern . '$/';
+		$callback->parent_options = array($callback->short_class);
 		
 		if (strpos($callback->short_method, '|')) {
 			$callback->short_method = '*';
 		}
 		if (strpos($callback->short_class, '|')) {
+			$callback->parent_options = explode('|', $callback->short_class);
 			$callback->short_class = '*';
 		}
 		if (strpos($callback->namespace, '|')) {
@@ -1190,17 +1269,15 @@ class Anchor {
 		if (!$url) {
 			return NULL;
 		}
-		
-		$parsed = parse_url($url);
-		
-		$url   = $parsed['path'];
-		$query = $parsed['query'];
+	
+		$query = parse_url($url, PHP_URL_QUERY);
+		$url   = parse_url($url, PHP_URL_PATH);
 		
 		parse_str($query, $param_aliases);
 		
 		$url = str_replace(' ', '', $url);
 		$url = str_replace('`', '\`', $url);		
-		$url = rtrim($url, '/');
+		$url = ($url == '/') ? $url : rtrim($url, '/');
 		
 		if (substr($url, 0, 1) != '*' && $url != '*') {
 			$url = '/' . $url;
@@ -1210,7 +1287,7 @@ class Anchor {
 		
 		$url = (object) $url;
 		$url->pattern = $url->scalar;
-		$url->subject = rtrim($url->scalar, '/*');
+		$url->subject = preg_replace('/\*$/', '', $url->scalar);
 		$url->params = array();
 		
 		preg_match_all(
@@ -1283,6 +1360,7 @@ class Anchor {
 		}
 		
 		$active_callback = self::getActiveCallback();
+		$active_callback = self::parseCallback($active_callback);
 		
 		if (strpos($callback, '?') === FALSE || !$active_callback) {
 			return $callback;
@@ -1383,25 +1461,25 @@ class Anchor {
 	 * @param callable $callback  The callback being executed
 	 * @return callable  The $callback
 	 */
-	private static function setActiveCallback($callback)
+	private static function pushActiveCallback($callback)
 	{
 		array_push(self::$active_callback, $callback);
 		return $callback;
 	}
 	
-	/**
-	 * Returns the data object that is passed between callbacks
-	 * 
-	 * @return stdClass  The data object
-	 */
-	public static function getData()
-	{
-		// initialize data object
-		if (!is_object(self::$persistent_data)) {
-			self::$persistent_data = new stdClass;
-		}
-		
-		return self::$persistent_data;
+	private static function popActiveCallback() {
+		return array_pop(self::$active_callback);
+	}
+
+	private static function getActiveData() {
+		return end(self::$active_data);
+	}
+	private static function pushActiveData($data) {
+		array_push(self::$active_data, $data);
+		return $data;
+	}
+	private static function popActiveData() {
+		return array_pop(self::$active_data);
 	}
 	
 	/**
