@@ -370,6 +370,12 @@ class Anchor {
 		array_push(self::$authorized_adapters, $controller);
 	}
 	
+	/**
+	 * undocumented function
+	 *
+	 * @param string $callable 
+	 * @return void
+	 */
 	private static function dispatchCallable($callable) {
 		if ($callable instanceof Closure) {
 			call_user_func_array(
@@ -481,6 +487,11 @@ class Anchor {
 		return $matches;
 	}
 	
+	/**
+	 * undocumented function
+	 *
+	 * @return void
+	 */
 	public static function make()
 	{
 		$args = func_get_args();
@@ -649,6 +660,13 @@ class Anchor {
 		return FALSE;
 	}
 	
+	/**
+	 * Reveal the active callback string or closure. Valid callback pieces are:
+	 *   method, class, namespace, short_class, short_method
+	 *
+	 * @param string $piece The piece of the callback string to return
+	 * @return mixed  Callback string or closure object
+	 */
 	public static function reveal($piece='method')
 	{
 		if (!($callback = self::getActiveCallback())) {
@@ -720,9 +738,36 @@ class Anchor {
 		self::$not_found_callback = $callback;
 	}
 	
-	public static function configureRequestPath($request_path) {}
-	public static function configureLegacyNamespacing() {}
-	public static function configureFragmentRouting() {}
+	/**
+	 * undocumented function
+	 *
+	 * @param string $request_path 
+	 * @return void
+	 */
+	public static function configureRequestPath($request_path) {
+		self::$request_path = $request_path;
+	}
+	
+	/**
+	 * undocumented function
+	 *
+	 * @return void
+	 */
+	public static function configureHashBangRouting() {
+		if (isset($_GET) && isset($_GET['_escaped_fragment_'])) {
+			self::configureRequestPath($_GET['_escaped_fragment_']);
+		}
+	}
+	
+	/**
+	 * undocumented function
+	 *
+	 * @return void
+	 */
+	public static function configureLegacyNamespacing() {
+		self::$callback_param_formatters['namespace'] => 'Anchor::upperCamelize';
+		self::$$namespace_separator = '_';
+	}
 	
 	/**
 	 * Set a token to use as shorthand for header conditions in in a route
