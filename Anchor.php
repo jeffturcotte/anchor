@@ -1162,6 +1162,10 @@ class Anchor {
 
 		$callback = self::parseCallback($callback_string);
 		
+		if (in_array($callback->short_class, $parsed_callback->parent_options)) {
+			return TRUE;
+		}
+		
 		foreach($parsed_callback->parent_options as $parent_class) {
 			if (is_subclass_of($callback->short_class, $parent_class)) {
 				return TRUE;
