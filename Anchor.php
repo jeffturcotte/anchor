@@ -302,7 +302,7 @@ class Anchor {
 	 * @param Closure $closure   The closure to execute for the route - if this is provided, $callback will be a name to reference the closure by
 	 * @return void
 	 */
-	public function add($map, $callback, $closure=NULL)
+	public static function add($map, $callback, $closure=NULL)
 	{
 		$headers = array();
 		$url     = NULL;
@@ -765,8 +765,8 @@ class Anchor {
 	 * @return void
 	 */
 	public static function configureLegacyNamespacing() {
-		self::$callback_param_formatters['namespace'] => 'Anchor::upperCamelize';
-		self::$$namespace_separator = '_';
+		self::$callback_param_formatters['namespace'] = 'Anchor::upperCamelize';
+		self::$namespace_separator = '_';
 	}
 	
 	/**
@@ -869,7 +869,7 @@ class Anchor {
 	 * @param Exception $exception 
 	 * @return void
 	 */
-	private function callHookCallbacks(&$hooks, $hook, $data=NULL, $exception=NULL)
+	private static function callHookCallbacks(&$hooks, $hook, $data=NULL, $exception=NULL)
 	{
 		if (isset($hooks[$hook])) {
 			foreach($hooks[$hook] as $hook_obj) {
