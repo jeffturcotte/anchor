@@ -792,6 +792,15 @@ class Anchor {
 		$callback = self::parseCallback( self::getActiveCallback() );
 		return $callback->namespace;
 	}
+
+	/**
+	 */
+	public static function getActivePath()
+	{
+		$callback = self::parseCallback( self::getActiveCallback() );
+		return strtolower(implode('/', array($callback->namespace, $callback->short_class, $callback->short_method)));
+
+	}
 	
 	/**
 	 * Returns the params for the current route
