@@ -782,6 +782,16 @@ class Anchor {
 		self::$tokens[$token] = $conditions;
 	}
 	
+	/**
+	 * Returns the namespace for the active route
+	 *
+	 * @return string  The namespace of the active route
+	 */
+	public static function getActiveNamespace()
+	{
+		$callback = self::parseCallback( self::getActiveCallback() );
+		return $callback->namespace;
+	}
 	
 	/**
 	 * Returns the params for the current route
@@ -1167,7 +1177,7 @@ class Anchor {
 		}
 		
 		foreach($parsed_callback->parent_options as $parent_class) {
-			if (is_subclass_of($callback->short_class, $parent_class)) {
+			if (is_subclass_of($callback->class, $parent_class)) {
 				return TRUE;
 			}
 		}
