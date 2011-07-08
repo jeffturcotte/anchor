@@ -9,7 +9,7 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 		Anchor::hook('init',   '*::*', 'TestController::init');
 		Anchor::hook('before', '*::*', 'TestController::before');
 		Anchor::hook('after',  '*::*', 'TestController::after');
-		Anchor::hook('final',  '*::*', 'TestController::_final');
+		Anchor::hook('finish',  '*::*', 'TestController::finish');
 		
 		Anchor::add('/', 'TestController::home');
 		Anchor::add('/:class/:id/:method', '*::*');
@@ -48,15 +48,15 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 	public function testFind() {
 		$this->assertEquals(
 			'/', 
-			Anchor::find('TestController::home')
+			Anchor::render('TestController::home')
 		);
 		$this->assertEquals(
 			'/test_controller/5/dynamic', 
-			Anchor::find('TestController::dynamic id', 5)
+			Anchor::render('TestController::dynamic id', 5)
 		);
 		$this->assertEquals(
 			'/test_controller/5-this_is_the_slug/dynamic', 
-			Anchor::find('TestController::dynamic id slug', 5, 'this_is_the_slug')
+			Anchor::render('TestController::dynamic id slug', 5, 'this_is_the_slug')
 		);
 	}
 	
@@ -82,7 +82,7 @@ class AuthorizedController {
 	public static function after($data) {
 		$data->test .= 'a';
 	}
-	public static function _final($data) {
+	public static function finish($data) {
 		$data->test .= 'f';
 	}
 }
