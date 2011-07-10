@@ -589,8 +589,8 @@ final class Anchor {
 	 */
 	public static function format($format, $underscorize=FALSE, $default=NULL)
 	{
-		// no callback, just return $format
-		if (!($callback = self::getActiveCallback())) {
+		// no callback, or format not a string, just return $format
+		if (!($callback = self::getActiveCallback()) || !is_string($format)) {
 			return $format;
 		}
 		
@@ -698,8 +698,11 @@ final class Anchor {
 						$property = $name;
 					}
 					
-					if (method_exists($data, $property) || method_exists($data, '__call')) {
-						$value = $data->$property();
+					if (substr($property, -2, 2) == '()') {
+						$property = substr($property, 0, -2);
+						if (method_exists($data, $property) || method_exists($data, '__call')) {
+							$value = $data->$property();
+						}
 					} else if (isset($data->$property)) {
 						$value = $data->$property;
 					}
@@ -1028,7 +1031,7 @@ final class Anchor {
 	{
 		if (isset($hooks[$hook])) {
 			foreach($hooks[$hook] as $hook_obj) {
-				$callback = self::resolveCallback($hook_obj->callback);
+				$callback = self::format($hook_obj->callback);
 				
 				if (!is_callable($callback)) {
 					continue;
@@ -1376,6 +1379,19 @@ final class Anchor {
 		self::$controller_path = realpath($path);
 	}
 	
+	public static function setGlobalFunctions()
+	{
+		if (!function_exists('a')) {
+			function a() {
+				$args = func_get_args();
+				return call_user_func_array(
+					array('Anchor', 'render'),
+					$args
+				);
+			}
+		}
+	}
+	
 	/**
 	 * convert a string to lowerCamelCase
 	 *
@@ -1411,7 +1427,7 @@ final class Anchor {
 	}
 	
 	private static function matchDerivativeCallback($parsed_callback, $callback_string)
-	{
+	{	
 		if (!preg_match($parsed_callback->parent_pattern, $callback_string)) {
 			return FALSE;
 		}
@@ -1675,49 +1691,7 @@ final class Anchor {
 		return $params;
 	}
 	
-	/**
-	 * undocumented function
-	 *
-	 * @param string $callback 
-	 * @return void
-	 */
-	private static function resolveCallback($callback)
-	{
-		if ($callback instanceof Closure) {
-			return $callback;
-		}
-		
-		$active_callback = self::getActiveCallback();
-		$active_callback = self::parseCallback($active_callback);
-		
-		if (strpos($callback, '?') === FALSE || !$active_callback) {
-			return $callback;
-		}
-		
-		$callback = self::parseCallback($callback);
-		
-		if ($callback->short_method == '?' && $active_callback->short_method) {
-			$callback->short_method = self::$active_callback->short_method;
-		}
-		if ($callback->short_class == '?' && $active_callback->short_class) {
-			$callback->short_class = $active_callback->short_class;
-		}
-		if ($callback->namespace == '?' && $active_callback->namespace) {
-			$callback->namespace = $active_callback->namespace;
-		}
-		
-		$resolved = $callback->short_method;
-		
-		if ($callback->short_class) {
-			$resolved = $callback->short_class . '::' . $resolved;
-		}
-		
-		if ($callback->namespace) {
-			$resolved = $callback->namespace . self::$namespace_separator . $resolved;
-		}
-		
-		return $resolved;
-	}
+
 	
 	/**
 	 * Converts a `camelCase` or `underscore_notation` string to `underscore_notation`

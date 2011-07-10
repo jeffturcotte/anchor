@@ -1,4 +1,6 @@
 <?php
+require_once 'PHPUnit/Framework.php';
+
 class AnchorTest extends PHPUnit_Framework_TestCase {
 	public static function setUpBeforeClass() {		
 		require 'Anchor.php';
@@ -14,6 +16,7 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 		Anchor::add('/', 'TestController::home');
 		Anchor::add('/:class/:id/:method', '*::*');
 		Anchor::add('/:class/%id-:slug/:method', '*::*');
+		Anchor::add('/:class/:method#:id-:slug', '*::*');
 	}
 	
 	public function testAuthorization() {
