@@ -483,6 +483,16 @@ final class Anchor {
 	}
 	
 	/**
+	 * Destroys all routes. This is most useful for running tests
+	 *
+	 * @return void
+	 */
+	public static function clear()
+	{
+		self::$routes = array();
+	}
+	
+	/**
 	 * dispatch a callable (closure or method string)
 	 *
 	 * @param string $callable 
