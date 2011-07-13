@@ -253,7 +253,7 @@ final class Anchor {
 	private static $param_types = array(
 		':' => '[^/]+',
 		'!' => '[A-Za-z][A-Za-z0-9_]+',
-		'%' => '[0-9]+',
+		'^' => '[0-9]+',
 		'@' => '[A-Za-z]+'
 	);
 
@@ -483,13 +483,14 @@ final class Anchor {
 	}
 	
 	/**
-	 * Destroys all routes. This is most useful for running tests
+	 * Destroys all hooks and routes. This is most useful for running tests
 	 *
 	 * @return void
 	 */
 	public static function clear()
 	{
 		self::$routes = array();
+		self::$hooks = array();
 	}
 	
 	/**
@@ -585,16 +586,17 @@ final class Anchor {
 	/**
 	 * Formats a string, replacing symbols with active callback values
 	 *
-	 *   %n  => active namespace
-	 *   %N  => active parent (outermost) namespace
-	 *   %c  => active class
+	 *   %n => active namespace
+	 *   %N => active parent/outermost namespace
+	 *   %c => active class
 	 *   %C => active short class
-	 *   %m  => active method
+	 *   %m => active method
 	 *   %M => active short method
-	 *   %p  => active path
+	 *   %p => active full path
+	 *   %P => active class path
 	 *
 	 * @param string $format         The string to format
-	 * @param boolean $underscorize  If the active callback values should be underscorized, does not affect active path
+	 * @param boolean $underscorize  If the active callback values should be underscorized, does not affect active path(s)
 	 * @return string                The formatted string
 	 */
 	public static function format($format, $underscorize=FALSE, $default=NULL)
@@ -614,14 +616,19 @@ final class Anchor {
 		// parse the callback
 		$callback = self::parseCallback($callback);
 		
-		// make the path
-		$path  = self::underscorize($callback->short_class) . '/';
-		$path .= self::underscorize($callback->short_method);
-		
-		if ($callback->namespace) {
-			$path = self::underscorize($callback->namespace) . '/' . $path;
-		}
+		// make the path and class path
+		$short_class  = self::underscorize($callback->short_class);
+		$short_method   = self::underscorize($callback->short_method);
+
+		$path = "{$short_class}/{$short_method}";
+		$class_path = $short_class;
 				
+		if ($callback->namespace) {
+			$namespace = self::underscorize($callback->namespace);
+			$path =  "{$namespace}/{$path}";
+			$class_path = "{$namespace}/{$class_path}";
+		}
+		
 		$formatter_pattern = "/[^%]%.{1}/i";
 		
 		// set the replacements
@@ -632,7 +639,8 @@ final class Anchor {
 			'%C' => ($underscorize) ? self::underscorize($callback->short_class) : $callback->short_class,
 			'%m' => ($underscorize) ? self::underscorize($callback->method) : $callback->method,
 			'%M' => ($underscorize) ? self::underscorize($callback->short_method) : $callback->short_method,
-			'%p' => ($path == '/') ? '' : $path
+			'%p' => ($path == '/') ? '' : $path,
+			'%P' => ($class_path == '/') ? '' : $class_path
 		);
 		
 		$formatted = str_replace(
@@ -646,24 +654,6 @@ final class Anchor {
 		}
 		
 		return $formatted;
-	}
-	
-	/**
-	 * Easy way to make an basic anchor tag
-	 *
-	 * @return string
-	 */
-	public static function make()
-	{
-		$args = func_get_args();
-		$text = array_shift($args);
-		$link = call_user_func_array(__CLASS__.'::find', $args);
-		
-		if ($text === NULL) {
-			$text = $link;
-		}
-		
-		return sprintf('<a href="%s">%s</a>', $link, $text);
 	}
 	
 	/**
@@ -692,6 +682,8 @@ final class Anchor {
 		if (isset(self::$closure_aliases[$callback])) {
 			$callback = self::$closure_aliases[$callback];
 		}
+		
+		$callback = self::format($callback);
 
 		if (isset($param_values[0])) {
 			$data =& $param_values[0];
@@ -938,9 +930,9 @@ final class Anchor {
 	 *
 	 * @return void
 	 */
-	public static function setHashBangRouting() {
+	public static function setFragmentRouting() {
 		if (isset($_GET) && isset($_GET['_escaped_fragment_'])) {
-			self::configureRequestPath($_GET['_escaped_fragment_']);
+			self::setRequestPath($_GET['_escaped_fragment_']);
 		}
 	}
 	
@@ -1007,6 +999,7 @@ final class Anchor {
 			);
 			unset($params[$short_class_param]);
 		}
+		
 		if ($short_method == '*' && isset($params[$short_method_param])) {
 			$short_method = call_user_func_array(
 				self::$callback_param_formatters['short_method'],
@@ -1243,8 +1236,6 @@ final class Anchor {
 
 		$callback = self::parseCallback($callback);
 
-
-		
 		$reflected_method = NULL;
 		$reflected_call   = NULL;
 		
@@ -1563,6 +1554,8 @@ final class Anchor {
 			$wild_pattern = ($callback->short_class == '*') ? '.+' : '.*';
 			$pattern = '(?P<' . self::$callback_param_names['short_class'] . '>' . str_replace('*', $wild_pattern, $callback->short_class) . ')::' . $pattern;
 			$derivative_pattern = '(?P<' . self::$callback_param_names['short_class'] . '>.+)::' . $derivative_pattern;
+			
+			
 		}
 		
 		$separator = str_replace('\\', '\\\\', self::$namespace_separator);

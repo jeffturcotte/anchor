@@ -11,12 +11,12 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 		Anchor::hook('init',   '*::*', 'TestController::init');
 		Anchor::hook('before', '*::*', 'TestController::before');
 		Anchor::hook('after',  '*::*', 'TestController::after');
+		Anchor::hook('catch Exception', '*::*', 'TestController::catchException');
 		Anchor::hook('finish',  '*::*', 'TestController::finish');
 		
 		Anchor::add('/', 'TestController::home');
 		Anchor::add('/:class/:id/:method', '*::*');
 		Anchor::add('/:class/%id-:slug/:method', '*::*');
-		Anchor::add('/:class/:method#:id-:slug', '*::*');
 	}
 	
 	public function testAuthorization() {
@@ -48,7 +48,7 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 		$this->assertFalse(Anchor::call('TestController::__notAllowedMagic'));
 	}
 	
-	public function testFind() {
+	public function testRender() {
 		$this->assertEquals(
 			'/', 
 			Anchor::render('TestController::home')
@@ -67,6 +67,17 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 		$data = Anchor::call('AuthorizedController::index');
 		$this->assertEquals('ibaf', $data->test);
 	}
+	
+	public function testFormat() {
+		$data = Anchor::call('AuthorizedController::index');
+		$this->assertEquals('AuthorizedController', $data->active_class);
+		$this->assertEquals('AuthorizedController', $data->active_short_class);
+		$this->assertEquals('AuthorizedController::index', $data->active_method);
+		$this->assertEquals('index', $data->active_short_method);
+		$this->assertEquals('authorized_controller/index', $data->active_full_path);
+		$this->assertEquals('authorized_controller', $data->active_class_path);
+
+	}
 }
 
 class UnauthorizedController {
@@ -74,17 +85,39 @@ class UnauthorizedController {
 }
 
 class AuthorizedController {
-	public function index() {}
+	public function index($data) {
+		$data->active_class = Anchor::format('%c');
+		$data->active_short_class = Anchor::format('%C');
+		$data->active_method = Anchor::format('%m');
+		$data->active_short_method = Anchor::format('%M');
+		$data->active_full_path = Anchor::format('%p');
+		$data->active_class_path = Anchor::format('%P');
+	}
+	
+	public function throwException() {
+		throw new Exception();
+	}
+	
+	public function throwExtendingException() {
+		throw new ExtendingException();
+	}
+
+	public static function catchException() {
+		$data->test = 'e';
+	}
 	
 	public static function init($data) {
 		$data->test = 'i';
 	}
+	
 	public static function before($data) {
 		$data->test .= 'b';
 	}
+	
 	public static function after($data) {
 		$data->test .= 'a';
 	}
+	
 	public static function finish($data) {
 		$data->test .= 'f';
 	}
@@ -99,3 +132,5 @@ class TestController extends AuthorizedController {
 	public function home() {}
 	public function dynamic() {}
 }
+
+class ExtendingException extends Exception {}
