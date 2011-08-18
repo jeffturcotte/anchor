@@ -502,10 +502,13 @@ final class Anchor {
 	/**
 	 * dispatch a callable (closure or method string)
 	 *
-	 * @param string $callable 
+	 * @param string|Closure $callable  The string callback or Closure to dispatch
+	 * @param object         $instance  The object to dispatch
+	 * @param object         &$data     The data for the request
 	 * @return void
 	 */
-	private static function dispatchCallable($callable, &$data) {
+	private static function dispatchCallable($callable, $instance, &$data)
+	{
 		if ($callable instanceof Closure) {
 			call_user_func_array(
 				$callable,
@@ -514,13 +517,28 @@ final class Anchor {
 			return TRUE;
 		}
 
+		$short_method = self::parseCallback($callable)->short_method;
+		$instance->$short_method($data);
+		return TRUE;
+	}
+
+	/**
+	 * Instantiate controller classes
+	 *
+	 * @param string|Closure $callable 
+	 * @return void
+	 */
+	private static function instantiateCallable($callable)
+	{
+		if ($callable instanceof Closure) {
+			return $callable;
+		}
+
 		$callback = self::parseCallback($callable);
 
 		$class = $callback->class;
 		$short_method = $callback->short_method;
-		$instance = new $class();
-		$instance->$short_method($data);
-		return TRUE;
+		return new $class();
 	}
 	
 	/**
@@ -557,6 +575,8 @@ final class Anchor {
 			$active_data = self::getActiveData();
 			
 			$hooks = self::collectHooks($callable);
+
+			$instance = self::instantiateCallable($callable);
 			
 			self::callHookCallbacks($hooks, 'init', $active_data);
 				
@@ -569,7 +589,7 @@ final class Anchor {
 			}
 			
 			try {
-				self::dispatchCallable($callable, $active_data);
+				self::dispatchCallable($callable, $instance, $active_data);
 			} catch (Exception $e) {
 				self::catchExceptionFromCall($hooks, $e, $active_data);
 			}
@@ -585,8 +605,12 @@ final class Anchor {
 			self::popActiveCallback();
 			self::popActiveHooks();
 			
+			if (method_exists($instance, '__destruct')) {
+				$instance->__destruct();
+			}
+
 			if ($exit) {
-			exit();
+				exit();
 			}
 			
 			$active_data = self::popActiveData();
