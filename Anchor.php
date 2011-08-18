@@ -209,6 +209,9 @@ final class Anchor {
 	 */
 	private static $hooks = array();
 	
+	private static $global_hooks = array();
+	private static $active_hooks = array();
+	
 	/**
 	 * Shortcut token for use when matching against HTTP headers in URLs
 	 *
@@ -294,6 +297,9 @@ final class Anchor {
 	 */
 	private static $namespace_separator = '\\';
 	
+	private static $url_param_formatter = 'Anchor::makeUrlFriendly';
+	
+	private static $running = FALSE;
 
 	// ==============
 	// = Public API =
@@ -444,7 +450,7 @@ final class Anchor {
 						$matches[2]
 					)
 				);
-			}	
+			}       
 		}
 		
 		$route = new Anchor();
@@ -458,7 +464,7 @@ final class Anchor {
 	}
 
 	/**
-	 * Adds an alias for a render map
+	 * Adds an alias for a link map
 	 * 
 	 * @param string $alias      The alias name
 	 * @param string $render_map The render map
@@ -524,7 +530,7 @@ final class Anchor {
 	 * @param stdClass        $data      The persistent data object that is passed to $callable
 	 * @return boolean        If $callable was successfully executed
 	 */
-	public static function &call($callable, $data=NULL)
+	public static function &call($callable, $data=NULL, $exit=FALSE)
 	{
 		// merge any incoming data
 		if ($data === NULL) {
@@ -533,53 +539,81 @@ final class Anchor {
 		}
 		
 		if (!($callable instanceof Closure)) {
-			if (!self::validateCallback($callable)) {
-				$false = FALSE;
-				return $false;
-			}
+		$callable = self::format($callable);
+
+		if (!self::validateCallback($callable)) {
+			$false = FALSE;
+			return $false;
 		}
+		}
+		
+		$hooks = array();
 		
 		self::pushActiveData($data);
 		self::pushActiveCallback($callable);
+		self::pushActiveHooks($hooks);
 		
 		try {
 			$active_data = self::getActiveData();
 			
 			$hooks = self::collectHooks($callable);
+			
 			self::callHookCallbacks($hooks, 'init', $active_data);
-			$hooks = self::collectHooks($callable);
-			self::callHookCallbacks($hooks, 'before', $active_data);
-		
+				
+			$hooks = array_merge($hooks, self::collectHooks($callable, TRUE));
+
+			try {
+				self::callHookCallbacks($hooks, 'before', $active_data);
+			} catch (Exception $e) {
+				self::catchExceptionFromCall($hooks, $e, $active_data);
+			}
+			
 			try {
 				self::dispatchCallable($callable, $active_data);
 			} catch (Exception $e) {
-				$exception = new ReflectionClass($e);
-			
-				do {
-					$hook_name = "catch " . $exception->getName();
-					if (self::callHookCallbacks($hooks, $hook_name, $active_data, $e)) {
-						break;
-					}
-				} while ($exception = $exception->getParentClass());
-			
-	 			if (!$exception) { 
-					self::popActiveData();
-					self::popActiveCallback();
-					throw $e; 
-				}
+				self::catchExceptionFromCall($hooks, $e, $active_data);
 			}
-		
-			self::callHookCallbacks($hooks, 'after', $active_data);
+			
+			try {
+				self::callHookCallbacks($hooks, 'after', $active_data);
+			} catch (Exception $e) {
+				self::catchExceptionFromCall($hooks, $e, $active_data);
+			}
+			
 			self::callHookCallbacks($hooks, 'finish', $active_data);
-	
+			
 			self::popActiveCallback();
+			self::popActiveHooks();
+			
+			if ($exit) {
+			exit();
+			}
 			
 			$active_data = self::popActiveData();
 			return $active_data;
 		} catch (Exception $e) {
 			self::popActiveCallback();
 			self::popActiveData();
+			self::popActiveHooks();
 			throw $e;
+		}
+	}
+	
+	private static function catchExceptionFromCall($hooks, $e, &$active_data) {
+		$exception = new ReflectionClass($e);
+	
+		do {
+			$hook_name = "catch " . $exception->getName();
+			if (self::callHookCallbacks($hooks, $hook_name, $active_data, $e)) {
+				break;
+			}
+		} while ($exception = $exception->getParentClass());
+	
+		if (!$exception) { 
+			self::popActiveData();
+			self::popActiveCallback();
+			self::popActiveHooks();
+			throw $e; 
 		}
 	}
 	
@@ -618,11 +652,15 @@ final class Anchor {
 		
 		// make the path and class path
 		$short_class  = self::underscorize($callback->short_class);
-		$short_method   = self::underscorize($callback->short_method);
+		$short_method = self::underscorize($callback->short_method);
 
 		$path = "{$short_class}/{$short_method}";
 		$class_path = $short_class;
 				
+		// make the class path
+		$class_path = self::underscorize($callback->short_class);
+		
+		// alter the full and class paths with namespace
 		if ($callback->namespace) {
 			$namespace = self::underscorize($callback->namespace);
 			$path =  "{$namespace}/{$path}";
@@ -661,21 +699,21 @@ final class Anchor {
 	 * 
 	 * Example usage, without or with : before param name:
 	 * 
-	 *   Anchor::render('Users::view id', 5);
-	 *   Anchor::render('Users::view :id', 5);
+	 *   Anchor::link('Users::view id', 5);
+	 *   Anchor::link('Users::view :id', 5);
 	 *
 	 * @param string $callback_key  A string containing a callback and (optionally) param names - params should be separated by space and may begin with a :
 	 * @return string  The matching URL
 	 */
-	public static function render($callback_key)
+	public static function link($callback_key)
 	{
 		$param_values = func_get_args();
 		$callback_key = trim(array_shift($param_values));
-
+		
 		if (isset(self::$aliases[$callback_key])) {
 			$callback_key = self::$aliases[$callback_key];
 		}
-
+		
 		$param_names  = preg_split('/\s+/', $callback_key);
 		$callback     = array_shift($param_names);
 		
@@ -684,13 +722,13 @@ final class Anchor {
 		}
 		
 		$callback = self::format($callback);
-
+		
 		if (isset($param_values[0])) {
 			$data =& $param_values[0];
-
+			
 			if (is_object($data)) {
 				$param_values = array();
-
+				
 				foreach($param_names as $key => $name) {
 					list($name, $property) = explode(':', $name);
 
@@ -723,7 +761,7 @@ final class Anchor {
 					$value = NULL;
 
 					if (isset($data[$property])) {
-						$value = $data[$property];	
+						$value = $data[$property];      
 					} else if (isset($data[$name])) {
 						$value = $data[$name];
 					}
@@ -734,7 +772,7 @@ final class Anchor {
 			}
 		}
 		
-		$param_names_count = count($param_names);		
+		$param_names_count = count($param_names);               
 		$param_values = array_slice($param_values, 0, $param_names_count);
 		$param_values = array_pad($param_values, $param_names_count, '');
 
@@ -793,16 +831,28 @@ final class Anchor {
 	 */
 	public static function hook($hook_name, $route_callback, $hook_callback) 
 	{
-		if (isset(self::$closure_aliases[$route_callback])) {
-			$route_callback = self::$closure_aliases[$route_callback];
+		$hooks =& self::$global_hooks;
+		
+		// push hooks to active hooks if running
+		if (self::$running) {
+		$hooks =& self::getActiveHooks();
 		}
 		
-		$hook = (object) 'Hook';
-		$hook->hook = $hook_name;
-		$hook->route_callback = self::parseCallback($route_callback);
-		$hook->callback  = $hook_callback;
-		array_push(self::$hooks, $hook);
+		$route_callbacks = preg_split('/\s*,\s*/', $route_callback);
+		
+		foreach($route_callbacks as $route_callback) {
+			if (isset(self::$closure_aliases[$route_callback])) {
+				$route_callback = self::$closure_aliases[$route_callback];
+			}
+			
+			$hook = (object) 'Hook';
+			$hook->hook = $hook_name;
+			$hook->route_callback = self::parseCallback($route_callback);
+			$hook->callback  = $hook_callback;
+			array_push($hooks, $hook);
+		}
 	}
+	
 	
 	/**
 	 * Returns a callback that matches the URL, headers and params passed
@@ -817,57 +867,58 @@ final class Anchor {
 	public static function resolve($url, $headers=array(), &$params=array(), &$data=NULL, &$offset=0)
 	{
 		if ($offset > (count(self::$routes) - 1)) {
-			return FALSE;
+		return FALSE;
 		}
-		
+
 		foreach(self::$routes as $key => $route) {
-			// skip any routes lower than offset
-			if ($key < $offset) {
-				continue;
-			}
-			
-			// match headers
-			if (!self::matchHeaders($route->headers, $headers)) {
-				continue;
-			}
-			
-			// match url
-			if (!self::matchUrl($route->url, $url, $params)) {
-				continue;
-			}
-						
-			// match and map param aliases
-			foreach($route->url->param_aliases as $from => $to) {
-				if (!isset($params[$from])) {
-					continue;
-				}
-				
-				$params[$to] = $params[$from];
-				unset($params[$from]);
-			}
-			
-			$offset = $key;
-			
-			// return closure name string or closure
-			if ($route->closure) {
-				$data = $route->data;
-				return $route->closure;
-			
-			// return callback string
-			} else {
-				$callback = self::buildCallback($route, $params);
-				if (!self::matchCallback($route->callback, $callback)) {
-					continue;
-				}
-				$data = $route->data;
-				return $callback;
-			}			
+		// skip any routes lower than offset
+		if ($key < $offset) {
+			continue;
 		}
-		
+
+		// match headers
+		if (!self::matchHeaders($route->headers, $headers)) {
+			continue;
+		}
+
+		// match url
+		if (!self::matchUrl($route->url, $url, $params)) {
+			continue;
+		}
+
+		// match and map param aliases
+		foreach($route->url->param_aliases as $from => $to) {
+			if (!isset($params[$from])) {
+			continue;
+			}
+
+			$params[$to] = $params[$from];
+			unset($params[$from]);
+		}
+
+		$offset = $key;
+
+		// return closure name string or closure
+		if ($route->closure) {
+			$data = $route->data;
+			return $route->closure;
+
+		// return callback string
+		} else {
+			$callback = self::buildCallback($route, $params);
+			if (!self::matchCallback($route->callback, $callback)) {
+			continue;
+			}
+			$data = $route->data;
+			return $callback;
+		}		
+		}
+
 		$offset = count(self::$routes);
-	
+
 		return FALSE;
 	}
+
 	
 	/**
 	 * Run the routes for the current request
@@ -877,6 +928,8 @@ final class Anchor {
 	 */
 	public static function run($exit=TRUE) 
 	{
+		self::$running = TRUE;
+		
 		$old_GET = $_GET;
 		$offset = 0;
 		
@@ -895,9 +948,9 @@ final class Anchor {
 				if ($callable === FALSE) {
 					throw new AnchorNotFoundException();
 				}
-				
+								
 				if (self::call($callable, $data)) {
-				 	break;
+					break;
 				} else {
 					$offset++;
 					continue;
@@ -1094,25 +1147,30 @@ final class Anchor {
 	 * @param string $callback 
 	 * @return void
 	 */
-	private static function collectHooks($callable) 
-	{	
+	private static function collectHooks($callable, $active=FALSE) 
+	{ 
+		$added_hooks =& self::$global_hooks;
+		if ($active) {
+		$added_hooks =& self::getActiveHooks();
+		}
+		
 		if ($callable instanceof Closure) {
-			$callable = 'Anchor_' . spl_object_hash($callable);
+		$callable = 'Anchor_' . spl_object_hash($callable);
 		}
 		
 		if (isset(self::$closure_aliases_flipped[$callable])) {
-			$callable = self::$closure_aliases_flipped[$callable];
+		$callable = self::$closure_aliases_flipped[$callable];
 		}
 		
 		$hooks = array();
 		
-		foreach(self::$hooks as $hook) {
-			if (self::matchDerivativeCallback($hook->route_callback, $callable)) {
-				if (!isset($hooks[$hook->hook])) {
-					$hooks[$hook->hook] = array();
-				}
-				array_push($hooks[$hook->hook], $hook);
+		foreach($added_hooks as $hook) {
+		if (self::matchDerivativeCallback($hook->route_callback, $callable)) {
+			if (!isset($hooks[$hook->hook])) {
+				$hooks[$hook->hook] = array();
 			}
+			array_push($hooks[$hook->hook], $hook);
+		}
 		}
 		
 		return $hooks;
@@ -1162,8 +1220,8 @@ final class Anchor {
 		foreach($route->url->params as $name => $param) {
 			if (isset($params[$name])) {
 				$anchor = str_replace(
-					$param->symbol, 
-					urlencode($params[$name]),
+					$param->symbol,
+					call_user_func_array(self::$url_param_formatter, array($params[$name])),
 					$anchor
 				);
 				unset($params[$name]);
@@ -1314,6 +1372,13 @@ final class Anchor {
 	 */
 	private static function validateAuthorization($class)
 	{
+		// auto authorize any class in the controller path
+		if (self::$controller_path && $class->getFilename()) {
+			if (strpos(realpath($class->getFilename()), realpath(self::$controller_path)) === 0) {
+			return TRUE;
+			}
+		}
+
 		do {
 			foreach(self::$authorized_adapters as $adapter) {
 				$adapter = str_replace('*', '.+', $adapter);
@@ -1386,11 +1451,16 @@ final class Anchor {
 			function a() {
 				$args = func_get_args();
 				return call_user_func_array(
-					array('Anchor', 'render'),
+					array('Anchor', 'link'),
 					$args
 				);
 			}
 		}
+	}
+	
+	public static function setURLParamFormatter($callback)
+	{
+		self::$url_param_formatter = $callback;
 	}
 	
 	/**
@@ -1428,7 +1498,7 @@ final class Anchor {
 	}
 	
 	private static function matchDerivativeCallback($parsed_callback, $callback_string)
-	{	
+	{       
 		if (!preg_match($parsed_callback->parent_pattern, $callback_string)) {
 			return FALSE;
 		}
@@ -1612,7 +1682,7 @@ final class Anchor {
 		parse_str($query, $param_aliases);
 		
 		$url = str_replace(' ', '', $url);
-		$url = str_replace('`', '\`', $url);		
+		$url = str_replace('`', '\`', $url);            
 		$url = ($url == '/') ? $url : rtrim($url, '/');
 		
 		if (substr($url, 0, 1) != '*' && $url != '*') {
@@ -1668,7 +1738,7 @@ final class Anchor {
 
 	private static function parseParams($string)
 	{
-		$param_pattern = '/\{?((:|!|%|@)([a-z][_a-z0-9]*))\}?/i';
+		$param_pattern = '/\{?((:|!|\^|@)([a-z][_a-z0-9]*))\}?/i';
 		
 		preg_match_all($param_pattern, $string, $matches);
 				
@@ -1694,6 +1764,56 @@ final class Anchor {
 		return $params;
 	}
 	
+	/**
+	 * Changes a string into a URL-friendly string
+	 *
+	 * Derived from MIT fURL::makeFriendly
+	 * Source: http://flourishlib.com/browser/fURL.php
+	 * License: http://flourishlib.com/docs/LicenseAgreement
+	 * Copyright (c) 2007-2011 Will Bond <will@flourishlib.com>
+	 * 
+	 * @param  string   $string      The string to convert
+	 * @param  integer  $max_length  The maximum length of the friendly URL
+	 * @param  string   $delimiter   The delimiter to use between words, defaults to `_`
+	 * @param  string   :$string
+	 * @param  string   :$delimiter
+	 * @return string  The URL-friendly version of the string
+	 */
+	private static function makeUrlFriendly($string, $max_length=NULL, $delimiter=NULL)
+	{
+		// This allows omitting the max length, but including a delimiter
+		if ($max_length && !is_numeric($max_length)) {
+			$delimiter  = $max_length;
+			$max_length = NULL;
+		}
+
+		//$string = fHTML::decode(fUTF8::ascii($string));
+		$string = strtolower(trim($string));
+		$string = str_replace("'", '', $string);
+
+		if (!strlen($delimiter)) {
+			$delimiter = '_';
+		}
+
+		$delimiter_replacement = strtr($delimiter, array('\\' => '\\\\', '$' => '\\$'));
+		$delimiter_regex       = preg_quote($delimiter, '#');
+
+		$string = preg_replace('#[^a-z0-9\-_]+#', $delimiter_replacement, $string);
+		$string = preg_replace('#' . $delimiter_regex . '{2,}#', $delimiter_replacement, $string);
+		$string = preg_replace('#_-_#', '-', $string);
+		$string = preg_replace('#(^' . $delimiter_regex . '+|' . $delimiter_regex . '+$)#D', '', $string);
+		
+		$length = strlen($string);
+		if ($max_length && $length > $max_length) {
+			$last_pos = strrpos($string, $delimiter, ($length - $max_length - 1) * -1);
+			if ($last_pos < ceil($max_length / 2)) {
+				$last_pos = $max_length;
+			}
+			$string = substr($string, 0, $last_pos);
+		}
+		
+		return $string;
+	}
 
 	
 	/**
@@ -1786,6 +1906,22 @@ final class Anchor {
 		return array_pop(self::$active_callback);
 	}
 
+	private static function &getActiveHooks() {
+		$keys = array_keys(self::$active_hooks);
+		$key  = end($keys);
+		return self::$active_hooks[$key];
+	}
+	
+	private static function &pushActiveHooks($hooks) {
+		array_push(self::$active_hooks, $hooks);
+		return $hooks;
+	}
+	
+	private static function &popActiveHooks() {
+		$hooks = array_pop(self::$active_hooks);
+		return $hooks;
+	}
+
 	/**
 	 * undocumented function
 	 *
@@ -1803,7 +1939,7 @@ final class Anchor {
 	 * @param string $data 
 	 * @return void
 	 */
-	private static function pushActiveData($data) {
+	private static function &pushActiveData($data) {
 		array_push(self::$active_data, $data);
 		return $data;
 	}
@@ -1875,7 +2011,7 @@ final class Anchor {
 			if (!empty($parts[1]) && preg_match('#^q=(\d(?:\.\d)?)#', $parts[1], $match)) {
 				$q = number_format((float)$match[1], 5);
 			} else {
-				$q = number_format(1.0, 5);	
+				$q = number_format(1.0, 5);     
 			}
 			$q .= $suffix--;
 			
