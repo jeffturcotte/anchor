@@ -825,7 +825,7 @@ final class Anchor {
 	 * @todo DOCUMENT HOOKS
 	 *
 	 * @param string $hook_name       The hook to attach the callback to
-	 * @param string $route_callback  The route callback to attach the callback to
+	 * @param string $route_callback  The route callback to attach the callback to - if not qualified to a namespace and class, *-*:: will be prepended
 	 * @param string $hook_callback   The callback to attach
 	 * @return void
 	 */
@@ -835,7 +835,11 @@ final class Anchor {
 		
 		// push hooks to active hooks if running
 		if (self::$running) {
-		$hooks =& self::getActiveHooks();
+			$hooks =& self::getActiveHooks();
+		}
+
+		if (strpos($route_callback, '::') === FALSE) {
+			$route_callback = '*_*::' . $route_callback;
 		}
 		
 		$route_callbacks = preg_split('/\s*,\s*/', $route_callback);
