@@ -827,10 +827,18 @@ final class Anchor {
 	 * @param string $hook_name       The hook to attach the callback to
 	 * @param string $route_callback  The route callback to attach the callback to - if not qualified to a namespace and class, *-*:: will be prepended
 	 * @param string $hook_callback   The callback to attach
+	 * @param string ...
 	 * @return void
 	 */
 	public static function hook($hook_name, $route_callback, $hook_callback) 
 	{
+		$args = func_get_args();
+		if (count($args) > 3) {
+			$hook_callbacks = array_slice($args, 2);
+		} else {
+			$hook_callbacks = array($hook_callback);
+		}
+
 		$hooks =& self::$global_hooks;
 		
 		// push hooks to active hooks if running
@@ -849,11 +857,13 @@ final class Anchor {
 				$route_callback = self::$closure_aliases[$route_callback];
 			}
 			
-			$hook = (object) 'Hook';
-			$hook->hook = $hook_name;
-			$hook->route_callback = self::parseCallback($route_callback);
-			$hook->callback  = $hook_callback;
-			array_push($hooks, $hook);
+			foreach ($hook_callbacks as $hook_callback) {
+				$hook = (object) 'Hook';
+				$hook->hook = $hook_name;
+				$hook->route_callback = self::parseCallback($route_callback);
+				$hook->callback  = $hook_callback;
+				array_push($hooks, $hook);
+			}
 		}
 	}
 	
