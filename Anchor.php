@@ -8,7 +8,10 @@
  * @license    MIT (see LICENSE or bottom of this file)
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
- * @version    1.0.0a1
+ *
+ * @version    1.0.0a2
+ * @changes    1.0.0a2 Fixed issue with callback pattern where namespace was being included in class [jt, 2011-08-24]
+ *
  */
 class AnchorNotFoundException extends Exception {}
 class AnchorContinueException extends Exception {}
@@ -1656,16 +1659,14 @@ final class Anchor {
 		$callback->parent_namespace = preg_replace('/(\\\\|_[A-Z]).*$/', '', $callback->namespace);
 		
 		// create callback pattern
-		$wild_pattern = ($callback->short_method == '*') ? '.+' : '.*';
+		$wild_pattern = ($callback->short_method == '*') ? '[^\\\\_]+' : '[^\\\\_]*';
 		$pattern = '(?P<' . self::$callback_param_names['short_method'] . '>' . str_replace('*', $wild_pattern, $callback->short_method) . ')';
 		$derivative_pattern = $pattern;
-		
+		 
 		if ($callback->short_class) {
-			$wild_pattern = ($callback->short_class == '*') ? '.+' : '.*';
+			$wild_pattern = ($callback->short_class == '*') ? '[^\\\\_]+' : '[^\\\\_]*';
 			$pattern = '(?P<' . self::$callback_param_names['short_class'] . '>' . str_replace('*', $wild_pattern, $callback->short_class) . ')::' . $pattern;
 			$derivative_pattern = '(?P<' . self::$callback_param_names['short_class'] . '>.+)::' . $derivative_pattern;
-			
-			
 		}
 		
 		$separator = str_replace('\\', '\\\\', self::$namespace_separator);
