@@ -546,7 +546,7 @@ final class Anchor {
 	 *
 	 * @param string|Closure  $callable  The string callback or closure to call
 	 * @param stdClass        $data      The persistent data object that is passed to $callable
-	 * @return boolean        If $callable was successfully executed
+	 * @return stdClass|FALSE  The $data or FALSE upon failure
 	 */
 	public static function &call($callable, $data=NULL, $exit=FALSE)
 	{
@@ -557,12 +557,12 @@ final class Anchor {
 		}
 		
 		if (!($callable instanceof Closure)) {
-		$callable = self::format($callable);
+			$callable = self::format($callable);
 
-		if (!self::validateCallback($callable)) {
-			$false = FALSE;
-			return $false;
-		}
+			if (!self::validateCallback($callable)) {
+				$false = FALSE;
+				return $false;
+			}
 		}
 		
 		$hooks = array();
@@ -581,7 +581,7 @@ final class Anchor {
 			self::callHookCallbacks($hooks, 'init', $active_data);
 				
 			$hooks = array_merge($hooks, self::collectHooks($callable, TRUE));
-
+			
 			try {
 				self::callHookCallbacks($hooks, 'before', $active_data);
 			} catch (Exception $e) {
@@ -871,7 +871,7 @@ final class Anchor {
 		}
 
 		if (strpos($route_callback, '::') === FALSE) {
-			$route_callback = '*_*::' . $route_callback;
+			$route_callback = '*::' . $route_callback;
 		}
 		
 		$route_callbacks = preg_split('/\s*,\s*/', $route_callback);
@@ -994,7 +994,9 @@ final class Anchor {
 					continue;
 				}
 			} catch (AnchorNotFoundException $e) {
-				self::call(self::$not_found_callback);
+				if (!self::call(self::$not_found_callback)) {
+					self::call('AnchorDefaultAdapter::notFound');
+				}
 				break;
 			} catch (AnchorContinueException $e) {
 				continue;
@@ -1189,26 +1191,26 @@ final class Anchor {
 	{ 
 		$added_hooks =& self::$global_hooks;
 		if ($active) {
-		$added_hooks =& self::getActiveHooks();
+			$added_hooks =& self::getActiveHooks();
 		}
 		
 		if ($callable instanceof Closure) {
-		$callable = 'Anchor_' . spl_object_hash($callable);
+			$callable = 'Anchor_' . spl_object_hash($callable);
 		}
 		
 		if (isset(self::$closure_aliases_flipped[$callable])) {
-		$callable = self::$closure_aliases_flipped[$callable];
+			$callable = self::$closure_aliases_flipped[$callable];
 		}
 		
 		$hooks = array();
 		
 		foreach($added_hooks as $hook) {
-		if (self::matchDerivativeCallback($hook->route_callback, $callable)) {
-			if (!isset($hooks[$hook->hook])) {
-				$hooks[$hook->hook] = array();
+			if (self::matchDerivativeCallback($hook->route_callback, $callable)) {
+				if (!isset($hooks[$hook->hook])) {
+					$hooks[$hook->hook] = array();
+				}
+				array_push($hooks[$hook->hook], $hook);
 			}
-			array_push($hooks[$hook->hook], $hook);
-		}
 		}
 		
 		return $hooks;
