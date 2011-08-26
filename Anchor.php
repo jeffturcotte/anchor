@@ -5,11 +5,13 @@
  * @copyright  Copyright (c) 2011 Jeff Turcotte, others
  * @author     Jeff Turcotte [jt] <jeff.turcotte@gmail.com>
  * @author     Will Bond [wb] <will@flourishlib.com>
+ * @author     Will Bond [wb-imarc] <will@imarc.net>
  * @license    MIT (see LICENSE or bottom of this file)
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a2
+ * @version    1.0.0a3
+ * @changes    1.0.0a3 Added automatic redirection of URLs with trailing slashes, ::disableTrailingSlashRedirect() [wb, 2011-08-26]
  * @changes    1.0.0a2 Fixed issue with callback pattern where namespace was being included in class [jt, 2011-08-24]
  *
  */
@@ -141,6 +143,13 @@ final class Anchor {
 	 * @var string
 	 */
 	private static $loading_callback = 'Anchor::load';
+
+	/**
+	 * If trailing slashes should be removed via redirect
+	 *
+	 * @var boolean
+	 */
+	private static $redirect_trailing_slashes = TRUE;
 
 	/**
 	 * A stack containing all of the data objects
@@ -500,6 +509,16 @@ final class Anchor {
 	{
 		self::$routes = array();
 		self::$hooks = array();
+	}
+
+	/**
+	 * If trailing slashes should not be removed via redirect
+	 *
+	 * @return void
+	 */
+	public static function disableTrailingSlashRedirect()
+	{
+		self::$redirect_trailing_slashes = FALSE;
 	}
 	
 	/**
@@ -969,6 +988,14 @@ final class Anchor {
 	 */
 	public static function run($exit=TRUE) 
 	{
+		$request_path = self::getRequestPath();
+		if (self::$redirect_trailing_slashes && strlen($request_path) > 1 && substr($request_path, -1) === '/') {
+			$trimmed_request_path = substr($request_path, 0, -1);
+			$query_string = strlen($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
+			header('Location: ' . self::getDomain() . $trimmed_request_path . $query_string);
+			exit;
+		}
+
 		self::$running = TRUE;
 		
 		$old_GET = $_GET;
@@ -979,7 +1006,7 @@ final class Anchor {
 			
 			try {
 				$callable = self::resolve(
-					self::getRequestPath(), 
+					$request_path, 
 					self::getHeaders(),
 					$_GET,
 					$data,
