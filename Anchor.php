@@ -11,7 +11,7 @@
  * @link       http://github.com/jeffturcotte/anchor
  *
  * @version    1.0.0a3
- * @changes    1.0.0a3 Added automatic redirection of URLs with trailing slashes, ::disableTrailingSlashRedirect() [wb, 2011-08-26]
+ * @changes    1.0.0a3 Added automatic redirection of URLs with trailing slashes, ::enableStrictRouting() [wb, 2011-08-26]
  * @changes    1.0.0a2 Fixed issue with callback pattern where namespace was being included in class [jt, 2011-08-24]
  *
  */
@@ -516,7 +516,7 @@ final class Anchor {
 	 *
 	 * @return void
 	 */
-	public static function disableTrailingSlashRedirect()
+	public static function enableStrictRouting()
 	{
 		self::$redirect_trailing_slashes = FALSE;
 	}
