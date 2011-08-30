@@ -800,20 +800,27 @@ final class Anchor {
 
 			} else if (is_array($data)) {
 				$param_values = array();
+				
+				if ($param_names) {
+					foreach($param_names as $key => $name) {
+						list($name, $property) = explode(':', $name);
 
-				foreach($param_names as $key => $name) {
-					list($name, $property) = explode(':', $name);
+						$value = NULL;
 
-					$value = NULL;
+						if (isset($data[$property])) {
+							$value = $data[$property];      
+						} else if (isset($data[$name])) {
+							$value = $data[$name];
+						}
 
-					if (isset($data[$property])) {
-						$value = $data[$property];      
-					} else if (isset($data[$name])) {
-						$value = $data[$name];
+						$param_names[$key] = $name;
+						$param_values[$key] = $value;
 					}
-
-					$param_names[$key] = $name;
-					$param_values[$key] = $value;
+				} else {
+					foreach ($data as $key => $value) {
+						$param_names[$key] = $key;
+						$param_values[$key] = $value;
+					}					
 				}
 			}
 		}
