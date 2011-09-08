@@ -10,7 +10,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a3
+ * @version    1.0.0a4
+ * @changes    1.0.0a4 Added setCallbackParamName() [jt, 2011-09-08]
  * @changes    1.0.0a3 Added automatic redirection of URLs with trailing slashes, ::enableStrictRouting() [wb, 2011-08-26]
  * @changes    1.0.0a2 Fixed issue with callback pattern where namespace was being included in class [jt, 2011-08-24]
  *
@@ -1508,6 +1509,15 @@ final class Anchor {
 		
 		require_once $path;
 		return TRUE;
+	}
+
+	public static function setCallbackParamName($type, $name)
+	{
+		if (!in_array($type, array_keys(self::$callback_param_names))) {
+			throw new AnchorProgrammerException('Callback param type must be one of: ' . join(',', array_keys(self::$callback_param_names)));
+		}
+
+		self::$callback_param_names[$type] = $name;
 	}
 	
 	public static function setControllerPath($path)
