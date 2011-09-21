@@ -1082,6 +1082,16 @@ final class Anchor {
 		$token = strtolower($token);
 		self::$tokens[$token] = $conditions;
 	}
+
+
+	public static function triggerNotFound()
+	{
+		if (!self::call(self::$not_found_callback)) {
+			self::call('AnchorDefaultAdapter::notFound');
+			exit();
+		}
+	}
+
 	
 	// ===============
 	// = Private API =
