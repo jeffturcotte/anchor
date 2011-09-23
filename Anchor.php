@@ -10,7 +10,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a4
+ * @version    1.0.0a5
+ * @changes    1.0.0a5 Added check() [wb, 2011-09-22]
  * @changes    1.0.0a4 Added setCallbackParamName() [jt, 2011-09-08]
  * @changes    1.0.0a3 Added automatic redirection of URLs with trailing slashes, ::enableStrictRouting() [wb, 2011-08-26]
  * @changes    1.0.0a2 Fixed issue with callback pattern where namespace was being included in class [jt, 2011-08-24]
@@ -499,6 +500,27 @@ final class Anchor {
 	public static function authorize($controller)
 	{
 		array_push(self::$authorized_adapters, $controller);
+	}
+
+	/**
+	 * Returns TRUE if a callback will handle the URL
+	 *
+	 * @param string  $url      The URL to match against
+	 * @return boolean  If the URL will be handled
+	 */
+	public static function check($url)
+	{
+		$offset  = 0;
+		$headers = array();
+		$params  = array();
+		$data    = NULL;
+		while ($callback = self::resolve($url, $headers, $params, $data, $offset)) {
+			if (self::validateCallback($callback)) {
+				return TRUE;
+			}
+			$offset++;
+		}
+		return FALSE;
 	}
 	
 	/**
