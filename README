@@ -46,6 +46,7 @@ a request variable name. The four symbols are the following single character:
 : - matches anything but a slash
 % - matches numbers
 @ - matches letters
+* - matches anything
 
 Here is an example of pulling a numeric id and string slug out of a URL:
 
@@ -110,7 +111,6 @@ Anchor::add('/', 'Home::main');
 Anchor::add('404', 'Home::notFound');
 
 Anchor::run();
-
 
 
 // Controller class in /path/to/controller/dir/Users.php

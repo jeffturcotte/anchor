@@ -10,7 +10,9 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a6
+ * @version    1.0.0a8
+ * @changes    1.0.0a8 Renamed enableStrictRouting to disableTrailingSlashRedirect [jt, 2012-01-30]
+ * @changes    1.0.0a7 Added * param type to replace * prefix and suffix [jt, 2012-01-30]
  * @changes    1.0.0a6 Added support for different URL formatters for different params [wb, 2011-10-18]
  * @changes    1.0.0a5 Added check() [wb, 2011-09-22]
  * @changes    1.0.0a4 Added setCallbackParamName() [jt, 2011-09-08]
@@ -272,7 +274,8 @@ final class Anchor {
 		':' => '[^/]+',
 		'!' => '[A-Za-z][A-Za-z0-9_]+',
 		'^' => '[0-9]+',
-		'@' => '[A-Za-z]+'
+		'@' => '[A-Za-z]+',
+		'*' => '.+'
 	);
 
 	private static $templates = array();
@@ -344,14 +347,11 @@ final class Anchor {
 	 *  - !param will match any valid PHP identifier name, i.e. letters, numbers and underscore
 	 *  - ^param will match digits
 	 *  - @param will match letters
+	 *  - *param will match anything (greedy)
 	 *
 	 * The following $map will match numeric user IDs:
 	 *
 	 *   /users/view/%id/preferences
-	 *
-	 * A * will match any character, but is only valid at the end of a $map:
-	 *
-	 *   /resources/%id/*
 	 *
 	 * A $map can also match specific HTTP headers by using the [header=value]
 	 * syntax before a path name. A space must be present between the closing ]
@@ -545,7 +545,7 @@ final class Anchor {
 	 *
 	 * @return void
 	 */
-	public static function enableStrictRouting()
+	public static function disableTrailingSlashRedirect()
 	{
 		self::$redirect_trailing_slashes = FALSE;
 	}
@@ -1850,15 +1850,7 @@ final class Anchor {
 			);
 		}
 
-		$url->pattern = (substr($url->pattern, 0, 1) != '*')
-			? '^' . $url->pattern
-			: substr($url->pattern, 1);
-
-		$url->pattern = (substr($url->pattern, -1) != '*')
-			? $url->pattern . '$'
-			: substr($url->pattern, 0, strlen($url->pattern) - 1);
-
-		$url->pattern = '`' . $url->pattern . '`';
+		$url->pattern = '`^' . $url->pattern . '/*?$`';
 
 		$url->param_aliases = array();
 
