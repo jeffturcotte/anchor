@@ -737,7 +737,11 @@ final class Anchor {
 
 		// alter the full and class paths with namespace
 		if ($callback->namespace) {
-			$namespace = self::underscorize($callback->namespace);
+			$namespace = preg_split('/(\\\\|_)/', $callback->namespace);
+			foreach($namespace as $key => $piece) {
+				$namespace[$key] = self::underscorize($piece);	
+			}
+			$namespace = join('/', $namespace);
 			$path =  "{$namespace}/{$path}";
 			$class_path = "{$namespace}/{$class_path}";
 		}
@@ -1061,7 +1065,7 @@ final class Anchor {
 				}
 			} catch (AnchorNotFoundException $e) {
 				if (!self::call(self::$not_found_callback)) {
-					self::call('AnchorDefaultAdapter::notFound');
+					//self::call('AnchorDefaultAdapter::notFound');
 				}
 				break;
 			} catch (AnchorContinueException $e) {
@@ -1733,9 +1737,9 @@ final class Anchor {
 
 		preg_match(
 			'/
-				(?P<method>
+				^(?P<method>
 					((?P<class>
-						((?P<namespace>[A-Za-z0-9\|\*\?]+)(\\\\|_))?
+						(?P<namespace>([A-Za-z0-9\|\*\?]+(\\\\|_))+)?
 						(?P<short_class>[A-Za-z0-9\|\*\?]+)
 					)::)?
 					(?P<short_method>[A-Za-z0-9\|\*\?\s_-]+)
@@ -1754,6 +1758,7 @@ final class Anchor {
 			}
 		}
 
+		$callback->namespace = trim($callback->namespace, '\\ _');
 		$callback->parent_namespace = preg_replace('/(\\\\|_[A-Z]).*$/', '', $callback->namespace);
 
 		// create callback pattern
