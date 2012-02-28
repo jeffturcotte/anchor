@@ -10,7 +10,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a8
+ * @version    1.0.0a9
+ * @changes    1.0.0a9 Brought back * suffix route definition [jt, 2012-02-28]
  * @changes    1.0.0a8 Renamed enableStrictRouting to disableTrailingSlashRedirect [jt, 2012-01-30]
  * @changes    1.0.0a7 Added * param type to replace * prefix and suffix [jt, 2012-01-30]
  * @changes    1.0.0a6 Added support for different URL formatters for different params [wb, 2011-10-18]
@@ -737,11 +738,7 @@ final class Anchor {
 
 		// alter the full and class paths with namespace
 		if ($callback->namespace) {
-			$namespace = preg_split('/(\\\\|_)/', $callback->namespace);
-			foreach($namespace as $key => $piece) {
-				$namespace[$key] = self::underscorize($piece);	
-			}
-			$namespace = join('/', $namespace);
+			$namespace = self::underscorize($callback->namespace);
 			$path =  "{$namespace}/{$path}";
 			$class_path = "{$namespace}/{$class_path}";
 		}
@@ -1065,7 +1062,7 @@ final class Anchor {
 				}
 			} catch (AnchorNotFoundException $e) {
 				if (!self::call(self::$not_found_callback)) {
-					//self::call('AnchorDefaultAdapter::notFound');
+					self::call('AnchorDefaultAdapter::notFound');
 				}
 				break;
 			} catch (AnchorContinueException $e) {
@@ -1737,9 +1734,9 @@ final class Anchor {
 
 		preg_match(
 			'/
-				^(?P<method>
+				(?P<method>
 					((?P<class>
-						(?P<namespace>([A-Za-z0-9\|\*\?]+(\\\\|_))+)?
+						((?P<namespace>[A-Za-z0-9\|\*\?]+)(\\\\|_))?
 						(?P<short_class>[A-Za-z0-9\|\*\?]+)
 					)::)?
 					(?P<short_method>[A-Za-z0-9\|\*\?\s_-]+)
@@ -1758,7 +1755,6 @@ final class Anchor {
 			}
 		}
 
-		$callback->namespace = trim($callback->namespace, '\\ _');
 		$callback->parent_namespace = preg_replace('/(\\\\|_[A-Z]).*$/', '', $callback->namespace);
 
 		// create callback pattern
@@ -1833,6 +1829,11 @@ final class Anchor {
 			$url = '/' . $url;
 		}
 
+		$match_to_end = '$';
+		if (substr($url, -1, 1) == '*') {
+			$match_to_end = '';	
+		}
+
 		$url = preg_replace('#/+#', '/', $url);
 
 		$url = (object) $url;
@@ -1855,7 +1856,7 @@ final class Anchor {
 			);
 		}
 
-		$url->pattern = '`^' . $url->pattern . '/*?$`';
+		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`";
 
 		$url->param_aliases = array();
 
