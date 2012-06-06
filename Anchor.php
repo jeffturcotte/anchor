@@ -2,7 +2,7 @@
 /**
  * Anchor is an *alpha* routing library for PHP 5
  *
- * @copyright  Copyright (c) 2011 Jeff Turcotte, others
+ * @copyright  Copyright (c) 2012 Jeff Turcotte, others
  * @author     Jeff Turcotte [jt] <jeff.turcotte@gmail.com>
  * @author     Will Bond [wb] <will@flourishlib.com>
  * @author     Will Bond [wb-imarc] <will@imarc.net>
@@ -10,7 +10,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a9
+ * @version    1.0.0a10
+ * @changes    1.0.0a10 Fixed bug with callHookCallbacks for catch hooks [jt, 2012-06-06]
  * @changes    1.0.0a9 Brought back * suffix route definition [jt, 2012-02-28]
  * @changes    1.0.0a8 Renamed enableStrictRouting to disableTrailingSlashRedirect [jt, 2012-01-30]
  * @changes    1.0.0a7 Added * param type to replace * prefix and suffix [jt, 2012-01-30]
@@ -1211,8 +1212,9 @@ final class Anchor {
 				}
 
 				call_user_func_array($callback, array(&$data, $exception));
+				
+				return TRUE;
 			}
-			return TRUE;
 		}
 
 		return FALSE;
