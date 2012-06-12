@@ -10,7 +10,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a10
+ * @version    1.0.0a11
+ * @changes    1.0.0a11 Added setCanonicalRedirect option, fixed catch hooks handling, made url pattern non greedy [jt, 2012-06-12]
  * @changes    1.0.0a10 Fixed bug with callHookCallbacks for catch hooks [jt, 2012-06-06]
  * @changes    1.0.0a9 Brought back * suffix route definition [jt, 2012-02-28]
  * @changes    1.0.0a8 Renamed enableStrictRouting to disableTrailingSlashRedirect [jt, 2012-01-30]
@@ -197,6 +198,13 @@ final class Anchor {
 		'underscorize' => array(),
 		'camelize'     => array()
 	);
+
+	/**
+	 * Redirect to canonical URL if secondary URL is given
+	 *
+	 * @var boolean
+	 */
+	private static $canonical_redirect = FALSE;
 
 	/**
 	 * An associative array with keys being explicit names give to closures
@@ -618,6 +626,18 @@ final class Anchor {
 			}
 		}
 
+		if (self::$canonical_redirect) {
+			$link = urldecode(
+				preg_replace('/\?.*$/', '', self::link($callable, $_GET))
+			);
+
+			if ($link != self::getRequestPath()) {
+				$url = self::getDomain() . $link;
+				header('Location: ' . $url);
+				exit($url);
+			}
+		}
+
 		$hooks = array();
 
 		self::pushActiveData($data);
@@ -678,15 +698,30 @@ final class Anchor {
 
 	private static function catchExceptionFromCall($hooks, $e, &$active_data) {
 		$exception = new ReflectionClass($e);
+		$called = FALSE;
 
 		do {
 			$hook_name = "catch " . $exception->getName();
-			if (self::callHookCallbacks($hooks, $hook_name, $active_data, $e)) {
-				break;
+
+			if (isset($hooks[$hook_name])) {
+				foreach($hooks[$hook_name] as $hook_obj) {
+					$callback = self::format($hook_obj->callback);
+
+					if (!is_callable($callback)) {
+						continue;
+					}
+
+					call_user_func_array($callback, array(&$active_data, $e));
+					$called = TRUE;
+				}
+
+				if ($called) {
+					break;
+				}
 			}
 		} while ($exception = $exception->getParentClass());
 
-		if (!$exception) {
+		if (!$called) {
 			self::popActiveData();
 			self::popActiveCallback();
 			self::popActiveHooks();
@@ -1212,12 +1247,9 @@ final class Anchor {
 				}
 
 				call_user_func_array($callback, array(&$data, $exception));
-				
-				return TRUE;
 			}
 		}
 
-		return FALSE;
 	}
 
 	/**
@@ -1594,6 +1626,11 @@ final class Anchor {
 		}
 	}
 
+	public static function setCanonicalRedirect()
+	{
+		self::$canonical_redirect = TRUE;
+	}
+
 	/**
 	 * Adds a formatter for a URL param
 	 *
@@ -1858,7 +1895,7 @@ final class Anchor {
 			);
 		}
 
-		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`";
+		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`U";
 
 		$url->param_aliases = array();
 
