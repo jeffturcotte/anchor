@@ -11,7 +11,7 @@
  * @link       http://github.com/jeffturcotte/anchor
  *
  * @version    1.0.0a11
- * @changes    1.0.0a11 Added setCanonicalRedirect option, fixed catch hooks handling, made url pattern non greedy [jt, 2012-06-12]
+ * @changes    1.0.0a11 Added setCanonicalRedirect option [jt, 2012-06-12]
  * @changes    1.0.0a10 Fixed bug with callHookCallbacks for catch hooks [jt, 2012-06-06]
  * @changes    1.0.0a9 Brought back * suffix route definition [jt, 2012-02-28]
  * @changes    1.0.0a8 Renamed enableStrictRouting to disableTrailingSlashRedirect [jt, 2012-01-30]
@@ -88,7 +88,6 @@ final class AnchorDefaultAdapter {
 							<li>Is your controller method a public instance method?</li>
 							<li>Don't want to see this page? Set your own 404 callback. See <code>::setNotFoundCallback()</code></li>
 							<li>Have you set up a route to this URL? See <code>::add()</code></li>
-							<li>Are you licensed to be building web apps? See <code>::applyForWebSiteLicense()</code></li>
 						</ul>
 					</div>
 				</div>
@@ -626,18 +625,6 @@ final class Anchor {
 			}
 		}
 
-		if (self::$canonical_redirect) {
-			$link = urldecode(
-				preg_replace('/\?.*$/', '', self::link($callable, $_GET))
-			);
-
-			if ($link != self::getRequestPath()) {
-				$url = self::getDomain() . $link;
-				header('Location: ' . $url);
-				exit($url);
-			}
-		}
-
 		$hooks = array();
 
 		self::pushActiveData($data);
@@ -874,7 +861,7 @@ final class Anchor {
 						$value = NULL;
 
 						if (isset($data[$property])) {
-							$value = $data[$property];      
+							$value = $data[$property];
 						} else if (isset($data[$name])) {
 							$value = $data[$name];
 						}
@@ -997,54 +984,58 @@ final class Anchor {
 	 * @param integer  $offset   The index in the array of routes to restart from - this allows resolving multiple times in sequence
 	 * @return FALSE|stdClass  Returns FALSE if no matching callback was found, otherwise
 	 */
-	public static function resolve($url, $headers=array(), &$params=array(), &$data=NULL, &$offset=0)
+	public static function resolve($url, $headers=array(), &$params=array(), &$data=NULL, &$offset=0, &$linkable=TRUE)
 	{
+		$linkable = TRUE;
+
 		if ($offset > (count(self::$routes) - 1)) {
-		return FALSE;
+			return FALSE;
 		}
 
 		foreach(self::$routes as $key => $route) {
-		// skip any routes lower than offset
-		if ($key < $offset) {
-			continue;
-		}
-
-		// match headers
-		if (!self::matchHeaders($route->headers, $headers)) {
-			continue;
-		}
-
-		// match url
-		if (!self::matchUrl($route->url, $url, $params)) {
-			continue;
-		}
-
-		// match and map param aliases
-		foreach($route->url->param_aliases as $from => $to) {
-			if (!isset($params[$from])) {
-			continue;
+			// skip any routes lower than offset
+			if ($key < $offset) {
+				continue;
 			}
 
-			$params[$to] = $params[$from];
-			unset($params[$from]);
-		}
-
-		$offset = $key;
-
-		// return closure name string or closure
-		if ($route->closure) {
-			$data = $route->data;
-			return $route->closure;
-
-		// return callback string
-		} else {
-			$callback = self::buildCallback($route, $params);
-			if (!self::matchCallback($route->callback, $callback)) {
-			continue;
+			// match headers
+			if (!self::matchHeaders($route->headers, $headers)) {
+				continue;
 			}
-			$data = $route->data;
-			return $callback;
-		}
+
+			// match url
+			if (!self::matchUrl($route->url, $url, $params)) {
+				continue;
+			}
+
+			$linkable = $route->url->linkable;
+
+			// match and map param aliases
+			foreach($route->url->param_aliases as $from => $to) {
+				if (!isset($params[$from])) {
+					continue;
+				}
+
+				$params[$to] = $params[$from];
+				unset($params[$from]);
+			}
+
+			$offset = $key;
+
+			// return closure name string or closure
+			if ($route->closure) {
+				$data = $route->data;
+				return $route->closure;
+
+			// return callback string
+			} else {
+				$callback = self::buildCallback($route, $params);
+				if (!self::matchCallback($route->callback, $callback)) {
+				continue;
+				}
+				$data = $route->data;
+				return $callback;
+			}
 		}
 
 		$offset = count(self::$routes);
@@ -1083,12 +1074,26 @@ final class Anchor {
 					self::getHeaders(),
 					$_GET,
 					$data,
-					$offset
+					$offset,
+					$linkable
 				);
 
 				if ($callable === FALSE) {
 					throw new AnchorNotFoundException();
 				}
+
+				if (self::$canonical_redirect && $linkable) {
+					$link = urldecode(
+						preg_replace('/\?.*$/', '', self::link($callable, $_GET))
+					);
+
+					if ($link != self::getRequestPath()) {
+						$url = self::getDomain() . $link;
+						header('Location: ' . $url);
+						exit($url);
+					}
+				}
+
 
 				if (self::call($callable, $data)) {
 					break;
@@ -1879,6 +1884,7 @@ final class Anchor {
 		$url->pattern = $url->scalar;
 		$url->subject = preg_replace('/\*$/', '', $url->scalar);
 		$url->params = self::parseParams($url->scalar);
+		$url->linkable = ($match_to_end) ? TRUE : FALSE;
 
 
 		foreach($url->params as $param) {
@@ -1895,7 +1901,7 @@ final class Anchor {
 			);
 		}
 
-		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`U";
+		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`";
 
 		$url->param_aliases = array();
 
