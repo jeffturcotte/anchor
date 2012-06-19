@@ -1107,6 +1107,7 @@ final class Anchor {
 				}
 				break;
 			} catch (AnchorContinueException $e) {
+				$offset++;
 				continue;
 			}
 		}
@@ -1160,13 +1161,26 @@ final class Anchor {
 		self::$tokens[$token] = $conditions;
 	}
 
-
+	/**
+	 * Triggers the anchor 404 handler at any point during routing
+	 *
+	 * @throws AnchorNotFoundException
+	 * @return void
+	 **/
 	public static function triggerNotFound()
 	{
-		if (!self::call(self::$not_found_callback)) {
-			self::call('AnchorDefaultAdapter::notFound');
-			exit();
-		}
+		throw new AnchorNotFoundException();
+	}
+
+	/**
+	 * Triggers the anchor router to continue to the next route at any point during routing
+	 *
+	 * @throws AnchorContinueException
+	 * @return void
+	 **/
+	public static function triggerContinue()
+	{
+		throw new AnchorContinueException();
 	}
 
 
@@ -1861,7 +1875,7 @@ final class Anchor {
 
 		$query = parse_url($url, PHP_URL_QUERY);
 		$fragment = parse_url($url, PHP_URL_FRAGMENT);
-		$url   = parse_url($url, PHP_URL_PATH);
+		$url = parse_url($url, PHP_URL_PATH);
 
 		parse_str($query, $param_aliases);
 
@@ -1902,7 +1916,6 @@ final class Anchor {
 		}
 
 		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`";
-
 		$url->param_aliases = array();
 
 		$url->fragment = $fragment;
@@ -1957,8 +1970,6 @@ final class Anchor {
 	 * @param  string   $string      The string to convert
 	 * @param  integer  $max_length  The maximum length of the friendly URL
 	 * @param  string   $delimiter   The delimiter to use between words, defaults to `_`
-	 * @param  string   :$string
-	 * @param  string   :$delimiter
 	 * @return string  The URL-friendly version of the string
 	 */
 	private static function makeUrlFriendly($string, $max_length=NULL, $delimiter=NULL)
@@ -2205,3 +2216,4 @@ final class Anchor {
 		return reset($output);
 	}
 }
+?>
