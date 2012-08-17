@@ -6,11 +6,13 @@
  * @author     Jeff Turcotte [jt] <jeff.turcotte@gmail.com>
  * @author     Will Bond [wb] <will@flourishlib.com>
  * @author     Will Bond [wb-imarc] <will@imarc.net>
+ * @author     Bill Bushee [bb] <bill@imarc.net>
  * @license    MIT (see LICENSE or bottom of this file)
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a11
+ * @version    1.0.0a12
+ * @changes    1.0.0a12 Added case sensitivity check to validateCallback() [bb, 2012-08-17]
  * @changes    1.0.0a11 Added setCanonicalRedirect option [jt, 2012-06-12]
  * @changes    1.0.0a10 Fixed bug with callHookCallbacks for catch hooks [jt, 2012-06-06]
  * @changes    1.0.0a9 Brought back * suffix route definition [jt, 2012-02-28]
@@ -853,7 +855,7 @@ final class Anchor {
 
 			} else if (is_array($data)) {
 				$param_values = array();
-				
+
 				if ($param_names) {
 					foreach($param_names as $key => $name) {
 						list($name, $property) = explode(':', $name);
@@ -873,7 +875,7 @@ final class Anchor {
 					foreach ($data as $key => $value) {
 						$param_names[$key] = $key;
 						$param_values[$key] = $value;
-					}					
+					}
 				}
 			}
 		}
@@ -1485,6 +1487,11 @@ final class Anchor {
 		try {
 			$reflected_method = new ReflectionMethod($callback->scalar);
 
+			// compare case (method names are not case sensitive)
+			if ($reflected_method->getName() != $callback->short_method) {
+				return FALSE;
+			}
+
 			// authorize declaring class
 			if (!self::validateAuthorization($reflected_method->getDeclaringClass())) {
 				return FALSE;
@@ -1889,7 +1896,7 @@ final class Anchor {
 
 		$match_to_end = '$';
 		if (substr($url, -1, 1) == '*') {
-			$match_to_end = '';	
+			$match_to_end = '';
 		}
 
 		$url = preg_replace('#/+#', '/', $url);
