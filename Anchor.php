@@ -11,7 +11,9 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a12
+ * @version    1.0.0a14
+ * @changes    1.0.0a14 Fixed issue with class authorization [jt, 2012-10-24]
+ * @changes    1.0.0a13 Fixed hook collection between __construct and init hooks, Adding hooks IN init hook no longer allowed [jt, 2012-10-24]
  * @changes    1.0.0a12 Added case sensitivity check to validateCallback() [bb, 2012-08-17]
  * @changes    1.0.0a11 Added setCanonicalRedirect option [jt, 2012-06-12]
  * @changes    1.0.0a10 Fixed bug with callHookCallbacks for catch hooks [jt, 2012-06-06]
@@ -636,13 +638,13 @@ final class Anchor {
 		try {
 			$active_data = self::getActiveData();
 
-			$hooks = self::collectHooks($callable);
+			$hooks = self::collectHooks($callable, TRUE);
 
 			$instance = self::instantiateCallable($callable);
 
-			self::callHookCallbacks($hooks, 'init', $active_data);
-
 			$hooks = array_merge($hooks, self::collectHooks($callable, TRUE));
+
+			self::callHookCallbacks($hooks, 'init', $active_data);
 
 			try {
 				self::callHookCallbacks($hooks, 'before', $active_data);
@@ -1322,6 +1324,7 @@ final class Anchor {
 	private static function collectHooks($callable, $active=FALSE)
 	{
 		$added_hooks =& self::$global_hooks;
+
 		if ($active) {
 			$added_hooks =& self::getActiveHooks();
 		}
@@ -1484,16 +1487,19 @@ final class Anchor {
 			}
 		}
 
+		// authorize class
+		try {
+			$reflected_class = new ReflectionClass($callback->class);
+			if (!self::validateAuthorization($reflected_class)) {
+				return FALSE;
+			}
+		} catch (ReflectionException $e) {}
+
 		try {
 			$reflected_method = new ReflectionMethod($callback->scalar);
 
 			// compare case (method names are not case sensitive)
 			if ($reflected_method->getName() != $callback->short_method) {
-				return FALSE;
-			}
-
-			// authorize declaring class
-			if (!self::validateAuthorization($reflected_method->getDeclaringClass())) {
 				return FALSE;
 			}
 
@@ -1517,11 +1523,6 @@ final class Anchor {
 			try {
 				$reflected_call = new ReflectionMethod($callback->class . '::__call');
 
-				// authorize declaring class
-				if (!self::validateAuthorization($reflected_method->getDeclaringClass())) {
-					return FALSE;
-				}
-
 				// make sure __call is public
 				if (!$reflected_call->isPublic()) {
 					return FALSE;
@@ -1530,7 +1531,7 @@ final class Anchor {
 			} catch (ReflectionException $e) {}
 		}
 
-		if (!$reflected_method && !$reflected_call) {
+		if (!$reflected_class || !$reflected_method && !$reflected_call) {
 			return FALSE;
 		}
 
