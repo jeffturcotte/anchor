@@ -1,4 +1,7 @@
 <?php
+/**
+ * PHPUnit tests for Anchor.
+ */
 
 class AnchorTest extends PHPUnit_Framework_TestCase {
 	public static function setUpBeforeClass() {
