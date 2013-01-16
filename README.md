@@ -2,7 +2,7 @@
 = Anchor // a routing library for PHP 5 =
 =========================================
 
-[![Build Status](https://travis-ci.org/imarc/anchor.png?branch=master)](undefined)
+[![Build Status](https://travis-ci.org/imarc/anchor.png?branch=master)](https://travis-ci.org/imarc/anchor)
 
 The following is a short example on how to use Anchor. Once you've gone
 through this, there is additional PHPDoc documentation in the class.
