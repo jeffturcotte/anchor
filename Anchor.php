@@ -100,7 +100,7 @@ final class AnchorDefaultAdapter {
 
 		</html>
 
-		<?
+		<?php
 	}
 }
 
