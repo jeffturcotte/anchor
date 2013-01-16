@@ -2236,4 +2236,4 @@ final class Anchor {
 		return reset($output);
 	}
 }
-?>
+
