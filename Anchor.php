@@ -11,7 +11,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a14
+ * @version    1.0.0a15
+ * @changes    1.0.0a15 Added ungreedy flag to pattern matcher [jt, 2013-1-18]
  * @changes    1.0.0a14 Fixed issue with class authorization [jt, 2012-10-24]
  * @changes    1.0.0a13 Fixed hook collection between __construct and init hooks, Adding hooks IN init hook no longer allowed [jt, 2012-10-24]
  * @changes    1.0.0a12 Added case sensitivity check to validateCallback() [bb, 2012-08-17]
@@ -1935,7 +1936,7 @@ final class Anchor {
 			);
 		}
 
-		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`";
+		$url->pattern = '`^' . $url->pattern . "/*?{$match_to_end}`U";
 		$url->param_aliases = array();
 
 		$url->fragment = $fragment;
