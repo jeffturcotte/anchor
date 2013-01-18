@@ -641,15 +641,11 @@ final class Anchor {
 
 			$hooks = self::collectHooks($callable, TRUE);
 
-			var_dump("number of hooks: ", count($hooks));
-
 			$instance = self::instantiateCallable($callable);
 
 			$hooks = array_merge($hooks, self::collectHooks($callable, TRUE));
 
 			self::callHookCallbacks($hooks, 'init', $active_data);
-
-			var_dump(__LINE__, $active_data);
 
 			try {
 				self::callHookCallbacks($hooks, 'before', $active_data);
@@ -657,15 +653,11 @@ final class Anchor {
 				self::catchExceptionFromCall($hooks, $e, $active_data);
 			}
 
-			var_dump(__LINE__, $active_data);
-
 			try {
 				self::dispatchCallable($callable, $instance, $active_data);
 			} catch (Exception $e) {
 				self::catchExceptionFromCall($hooks, $e, $active_data);
 			}
-
-			var_dump(__LINE__, $active_data);
 
 			try {
 				self::callHookCallbacks($hooks, 'after', $active_data);
@@ -673,11 +665,7 @@ final class Anchor {
 				self::catchExceptionFromCall($hooks, $e, $active_data);
 			}
 
-			var_dump(__LINE__, $active_data);
-
 			self::callHookCallbacks($hooks, 'finish', $active_data);
-
-			var_dump(__LINE__, $active_data);
 
 			self::popActiveCallback();
 			self::popActiveHooks();
