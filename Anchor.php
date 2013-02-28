@@ -1276,8 +1276,9 @@ final class Anchor {
 
 	}
 
+
 	/**
-	 * Converts an `underscore_notation` or `camelCase` string to `camelCase`
+	 * Converts an `underscore_notation`, `dash-notation', or `camelCase` string to `camelCase`
 	 *
 	 * Derived from MIT fGrammer::camelize
 	 * Source: http://flourishlib.com/browser/fGrammar.php
@@ -1300,7 +1301,7 @@ final class Anchor {
 		$string = $original;
 
 		// Check to make sure this is not already camel case
-		if (strpos($string, '_') === FALSE) {
+		if (strpos($string, '_') === FALSE && strpos($string, '-') === FALSE) {
 			if ($upper) {
 				$string = strtoupper($string[0]) . substr($string, 1);
 			}
@@ -1309,7 +1310,7 @@ final class Anchor {
 		} else {
 			$string = strtolower($string);
 			if ($upper) { $string = strtoupper($string[0]) . substr($string, 1); }
-			$string = preg_replace('/(_([a-z0-9]))/e', 'strtoupper("\2")', $string);
+			$string = preg_replace('/((_|-)([a-z0-9]))/e', 'strtoupper("\3")', $string);
 		}
 
 		self::$cache['camelize'][$key] =& $string;
