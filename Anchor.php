@@ -338,6 +338,14 @@ final class Anchor {
 
 	private static $running = FALSE;
 
+	/**
+	 * The delimiter for translating strings into a URL friendly format
+	 * 
+	 * @var string
+	 */
+	private static $word_delimiter = '-';
+
+
 	// ==============
 	// = Public API =
 	// ==============
@@ -1995,7 +2003,7 @@ final class Anchor {
 		$string = str_replace("'", '', $string);
 
 		if (!strlen($delimiter)) {
-			$delimiter = '_';
+			$delimiter = self::$word_delimiter;
 		}
 
 		$delimiter_replacement = strtr($delimiter, array('\\' => '\\\\', '$' => '\\$'));
