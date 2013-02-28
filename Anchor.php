@@ -286,7 +286,7 @@ final class Anchor {
 	 */
 	private static $param_types = array(
 		':' => '[^/]+',
-		'!' => '[A-Za-z][A-Za-z0-9_]+',
+		'!' => '[A-Za-z][A-Za-z0-9_-]+',
 		'^' => '[0-9]+',
 		'@' => '[A-Za-z]+',
 		'*' => '.+'
