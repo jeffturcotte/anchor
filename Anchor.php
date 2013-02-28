@@ -11,7 +11,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a15
+ * @version    1.0.0a16
+ * @changes    1.0.0a16 [BREAK] Added permanent canonical redirect option and dash word delimiter options [jt, 2013-02-28]
  * @changes    1.0.0a15 Added ungreedy flag to pattern matcher [jt, 2013-1-18]
  * @changes    1.0.0a14 Fixed issue with class authorization [jt, 2012-10-24]
  * @changes    1.0.0a13 Fixed hook collection between __construct and init hooks, Adding hooks IN init hook no longer allowed [jt, 2012-10-24]
@@ -291,6 +292,13 @@ final class Anchor {
 		'@' => '[A-Za-z]+',
 		'*' => '.+'
 	);
+
+	/**
+	 * Whether or not the canonical redirect should be permanent
+	 *
+	 * @var bool
+	 */
+	private static $permanent_canonical_redirect = FALSE;
 
 	private static $templates = array();
 
@@ -1102,6 +1110,9 @@ final class Anchor {
 
 					if ($link != self::getRequestPath()) {
 						$url = self::getDomain() . $link;
+						if (self::$permanent_canonical_redirect) {
+							header('HTTP/1.1 301 Moved Permanently');
+						}
 						header('Location: ' . $url);
 						exit($url);
 					}
@@ -1663,9 +1674,16 @@ final class Anchor {
 		}
 	}
 
-	public static function setCanonicalRedirect()
+	/**
+	 * If a URL exists for this resource that is different, redirect
+	 *
+	 * @param boolean $permanent Whether the redirect should be permanent
+	 * @return void
+	 */
+	public static function setCanonicalRedirect($permanent=FALSE)
 	{
 		self::$canonical_redirect = TRUE;
+		self::$permanent_canonical_redirect = $permanent;
 	}
 
 	/**
@@ -2069,6 +2087,10 @@ final class Anchor {
 			} while ($old_string != $string);
 
 			$string = strtolower($string);
+		}
+
+		if (self::$word_delimiter != '_') {
+			$string = str_replace('_', self::$word_delimiter, $string);
 		}
 
 		self::$cache['underscorize'][$key] =& $string;
