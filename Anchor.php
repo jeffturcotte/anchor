@@ -1046,6 +1046,7 @@ final class Anchor {
 			// return closure name string or closure
 			if ($route->closure) {
 				$data = $route->data;
+				$linkable = FALSE;
 				return $route->closure;
 
 			// return callback string
