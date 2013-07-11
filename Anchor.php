@@ -11,7 +11,8 @@
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0a16
+ * @version    1.0.0
+ * @changes    1.0.0 Added multiple namespace support [jt, 2013-07-11]
  * @changes    1.0.0a16 [BREAK] Added permanent canonical redirect option and dash word delimiter options [jt, 2013-02-28]
  * @changes    1.0.0a15 Added ungreedy flag to pattern matcher [jt, 2013-1-18]
  * @changes    1.0.0a14 Fixed issue with class authorization [jt, 2012-10-24]
@@ -325,7 +326,7 @@ final class Anchor {
 	 * @var array
 	 */
 	private static $callback_param_formatters = array(
-		'namespace'    => 'Anchor::underscorize',
+		'namespace'    => 'Anchor::formatNamespace',
 		'short_class'  => 'Anchor::upperCamelize',
 		'short_method' => 'Anchor::lowerCamelize'
 	);
@@ -340,7 +341,8 @@ final class Anchor {
 	private static $url_param_formatter = array(
 		'*' => array(
 			'*'  => 'Anchor::makeUrlFriendly',
-			'id' => 'urlencode'
+			'id' => 'urlencode',
+			'namespace' => 'Anchor::makeUrlFriendlyNamespace'
 		)
 	);
 
@@ -814,6 +816,15 @@ final class Anchor {
 		return $formatted;
 	}
 
+	public function formatNamespace($namespace)
+	{
+		$namespaces = explode('/', $namespace);
+		$namespaces = array_map(__CLASS__.'::upperCamelize', $namespaces);
+		$namespace = self::$namespace_separator . join(self::$namespace_separator, $namespaces);
+
+		return $namespace;
+	}
+
 	/**
 	 * Generates a link from a callback/params string
 	 *
@@ -1053,7 +1064,7 @@ final class Anchor {
 			} else {
 				$callback = self::buildCallback($route, $params);
 				if (!self::matchCallback($route->callback, $callback)) {
-				continue;
+					continue;
 				}
 				$data = $route->data;
 				return $callback;
@@ -1118,7 +1129,6 @@ final class Anchor {
 						exit($url);
 					}
 				}
-
 
 				if (self::call($callable, $data)) {
 					break;
@@ -1502,6 +1512,7 @@ final class Anchor {
 		$reflected_method = NULL;
 		$reflected_call   = NULL;
 
+
 		// don't autoload classes, use the configured or default loader
 		if (!class_exists($callback->class, FALSE)) {
 			if (!self::callLoadCallback($callback)) {
@@ -1583,14 +1594,16 @@ final class Anchor {
 		// auto authorize any class in the controller path
 		if (self::$controller_path && $class->getFilename()) {
 			if (strpos(realpath($class->getFilename()), realpath(self::$controller_path)) === 0) {
-			return TRUE;
+				return TRUE;
 			}
 		}
 
 		do {
 			foreach(self::$authorized_adapters as $adapter) {
 				$adapter = str_replace('*', '.+', $adapter);
-				if (preg_match('/^' . $adapter . '$/i', $class->getName())) {
+				$classname = str_replace('\\', '\\\\', $class->getName());
+
+				if (preg_match('/^\\\\?' . $classname . '$/i', $adapter)) {
 					return TRUE;
 				}
 			}
@@ -1829,9 +1842,9 @@ final class Anchor {
 
 		preg_match(
 			'/
-				(?P<method>
+				^(?P<method>
 					((?P<class>
-						((?P<namespace>[A-Za-z0-9\|\*\?]+)(\\\\|_))?
+						((?P<namespace>[A-Za-z0-9\|\*\?\\\\]+)(\\\\|_))?
 						(?P<short_class>[A-Za-z0-9\|\*\?]+)
 					)::)?
 					(?P<short_method>[A-Za-z0-9\|\*\?\s_-]+)
@@ -1850,7 +1863,9 @@ final class Anchor {
 			}
 		}
 
-		$callback->parent_namespace = preg_replace('/(\\\\|_[A-Z]).*$/', '', $callback->namespace);
+		preg_match('/^\\\\?([^\\\\]+)/i', $callback->class, $parent_namespace_matches);
+		$callback->parent_namespace = (isset($parent_namespace_matches[0]))
+			? $parent_namespace_matches[0] : NULL;
 
 		// create callback pattern
 		$wild_pattern = ($callback->short_method == '*') ? '[^\\\\_]+' : '[^\\\\_]*';
@@ -1867,8 +1882,9 @@ final class Anchor {
 
 		if ($callback->namespace) {
 			$wild_pattern = ($callback->namespace == '*') ? '.+' : '.*';
-			$pattern = '(?P<' . self::$callback_param_names['namespace'] . '>' . str_replace('*', $wild_pattern, $callback->namespace) . ')' . $separator . $pattern;
-			$derivative_pattern = '(?P<' . self::$callback_param_names['namespace'] . '>' . str_replace('*', '.+', $callback->namespace) . ')' . $separator . $derivative_pattern;
+			$pattern_namespace = str_replace('\\', '\\\\', $callback->namespace);
+			$pattern = '(?P<' . self::$callback_param_names['namespace'] . '>' . str_replace('*', $wild_pattern, $pattern_namespace) . ')' . $separator . $pattern;
+			$derivative_pattern = '(?P<' . self::$callback_param_names['namespace'] . '>' . str_replace('*', '.+', $pattern_namespace) . ')' . $separator . $derivative_pattern;
 		}
 
 		$callback->pattern = '/^' . $pattern . '$/';
@@ -1970,7 +1986,7 @@ final class Anchor {
 
 	private static function parseParams($string)
 	{
-		$param_pattern = '/\{?((:|!|\^|@)([a-z][_a-z0-9]*))\}?/i';
+		$param_pattern = '/\{?((\*|:|!|\^|@)([a-z][_a-z0-9]*))\}?/i';
 
 		preg_match_all($param_pattern, $string, $matches);
 
@@ -2028,7 +2044,7 @@ final class Anchor {
 		$delimiter_replacement = strtr($delimiter, array('\\' => '\\\\', '$' => '\\$'));
 		$delimiter_regex       = preg_quote($delimiter, '#');
 
-		$string = preg_replace('#[^a-z0-9\-_]+#', $delimiter_replacement, $string);
+		$string = preg_replace('#[^a-z0-9/\-_]+#', $delimiter_replacement, $string);
 		$string = preg_replace('#' . $delimiter_regex . '{2,}#', $delimiter_replacement, $string);
 		$string = preg_replace('#_-_#', '-', $string);
 		$string = preg_replace('#(^' . $delimiter_regex . '+|' . $delimiter_regex . '+$)#D', '', $string);
@@ -2042,6 +2058,14 @@ final class Anchor {
 			$string = substr($string, 0, $last_pos);
 		}
 
+		return $string;
+	}
+
+
+	private static function makeUrlFriendlyNamespace($string)
+	{
+		$string = str_replace('\\', '/', $string);
+		$string = self::makeUrlFriendly($string);
 		return $string;
 	}
 
@@ -2095,6 +2119,7 @@ final class Anchor {
 		}
 
 		self::$cache['underscorize'][$key] =& $string;
+
 		return $string;
 	}
 
