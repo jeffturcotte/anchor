@@ -8,11 +8,13 @@
  * @author     Will Bond [wb-imarc] <will@imarc.net>
  * @author     Bill Bushee [bb] <bill@imarc.net>
  * @author     Kerri Gertz [kg] <kerri@imarc.net>
+ * @author     Kevin Hamer [kh] <kevin@imarc.net>
  * @license    MIT (see LICENSE or bottom of this file)
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.1
+ * @version    1.1.0
+ * @changes    1.1.0 Backwards Compatibility Break - changed Anchor to DEFAULT to using autoloaders [kh, 2013-09-12]
  * @changes    1.0.1 Fixed parent namespace issue [kg, 2013-09-12]
  * @changes    1.0.0 Added multiple namespace support [jt, 2013-07-11]
  * @changes    1.0.0a16 [BREAK] Added permanent canonical redirect option and dash word delimiter options [jt, 2013-02-28]
@@ -158,7 +160,7 @@ final class Anchor {
 	 *
 	 * @var string
 	 */
-	private static $loading_callback = 'Anchor::load';
+	private static $loading_callback = '';
 
 	/**
 	 * If trailing slashes should be removed via redirect
@@ -352,7 +354,7 @@ final class Anchor {
 
 	/**
 	 * The delimiter for translating strings into a URL friendly format
-	 * 
+	 *
 	 * @var string
 	 */
 	private static $word_delimiter = '-';
@@ -613,7 +615,7 @@ final class Anchor {
 	 * @param string|Closure $callable
 	 * @return void
 	 */
-	private static function instantiateCallable($callable)
+	private static function instantiateCallable($callable, &$data)
 	{
 		if ($callable instanceof Closure) {
 			return $callable;
@@ -623,7 +625,7 @@ final class Anchor {
 
 		$class = $callback->class;
 		$short_method = $callback->short_method;
-		return new $class();
+		return new $class($data);
 	}
 
 	/**
@@ -661,7 +663,7 @@ final class Anchor {
 
 			$hooks = self::collectHooks($callable, TRUE);
 
-			$instance = self::instantiateCallable($callable);
+			$instance = self::instantiateCallable($callable, $active_data);
 
 			$hooks = array_merge($hooks, self::collectHooks($callable, TRUE));
 
@@ -1517,8 +1519,14 @@ final class Anchor {
 
 		// don't autoload classes, use the configured or default loader
 		if (!class_exists($callback->class, FALSE)) {
-			if (!self::callLoadCallback($callback)) {
-				return FALSE;
+			if (self::$loading_callback) {
+				if (!self::callLoadCallback($callback)) {
+					return FALSE;
+				}
+			} else {
+				if (!class_exists($callback->class)) {
+					return FALSE;
+				}
 			}
 		}
 
@@ -1584,6 +1592,23 @@ final class Anchor {
 		return call_user_func_array(self::$loading_callback, array($callback));
 	}
 
+	/**
+	 * Allows you to provide a custom callback for loading callbacks.
+	 *
+	 * By default, Anchor **relies on the autoloaders** to load controllers.
+	 * Previously, this was set to 'Anchor::load', which does some loading, but
+	 * isn't as flexible and is strict about where it will load from.
+	 *
+	 * The callback should take one argument, a stdClass object with properties
+	 * as defined by ::parseCallback().
+	 *
+	 * @param function $callback
+	 * @return boolean
+	 */
+	public static function setLoadCallback($callback)
+	{
+		self::$loading_callback = $callback;
+	}
 
 	/**
 	 * validate the authorization of the controller class
@@ -1642,7 +1667,7 @@ final class Anchor {
 			foreach($path as $key => $piece) {
 				$piece = preg_replace('/([a-zA-Z])([0-9])/', '\1_\2', $piece);
 				$piece = preg_replace('/([a-z0-9A-Z])([A-Z])/', '\1_\2', $piece);
-				$path[$key] = strtolower($piece);
+				$path[$key] = ucwords(strtolower($piece));
 			}
 
 			array_push($path, $file);
