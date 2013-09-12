@@ -7,11 +7,13 @@
  * @author     Will Bond [wb] <will@flourishlib.com>
  * @author     Will Bond [wb-imarc] <will@imarc.net>
  * @author     Bill Bushee [bb] <bill@imarc.net>
+ * @author     Kerri Gertz [kg] <kerri@imarc.net>
  * @license    MIT (see LICENSE or bottom of this file)
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
  *
- * @version    1.0.0
+ * @version    1.0.1
+ * @changes    1.0.1 Fixed parent namespace issue [kg, 2013-09-12]
  * @changes    1.0.0 Added multiple namespace support [jt, 2013-07-11]
  * @changes    1.0.0a16 [BREAK] Added permanent canonical redirect option and dash word delimiter options [jt, 2013-02-28]
  * @changes    1.0.0a15 Added ungreedy flag to pattern matcher [jt, 2013-1-18]
@@ -1863,7 +1865,7 @@ final class Anchor {
 			}
 		}
 
-		preg_match('/^\\\\?([^\\\\]+)/i', $callback->class, $parent_namespace_matches);
+		preg_match('/^\\\\?([^\\\\_]+)/i', $callback->class, $parent_namespace_matches);
 		$callback->parent_namespace = (isset($parent_namespace_matches[0]))
 			? $parent_namespace_matches[0] : NULL;
 
