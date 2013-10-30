@@ -2063,6 +2063,8 @@ final class Anchor {
 		//$string = fHTML::decode(fUTF8::ascii($string));
 		$string = strtolower(trim($string));
 		$string = str_replace("'", '', $string);
+		$string = str_replace("/", ' ', $string);
+
 
 		if (!strlen($delimiter)) {
 			$delimiter = self::$word_delimiter;
