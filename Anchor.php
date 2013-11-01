@@ -1343,8 +1343,12 @@ final class Anchor {
 		// Handle underscore notation
 		} else {
 			$string = strtolower($string);
-			if ($upper) { $string = strtoupper($string[0]) . substr($string, 1); }
-			$string = preg_replace('/((_|-)([a-z0-9]))/e', 'strtoupper("\3")', $string);
+			if ($upper) {
+				$string = strtoupper($string[0]) . substr($string, 1);
+			}
+			$string = preg_replace_callback('/(_|-)([a-z0-9])/', function($matches) {
+		        return strtoupper(ltrim($matches[0], '-_'));
+			}, $string);
 		}
 
 		self::$cache['camelize'][$key] = $string;
