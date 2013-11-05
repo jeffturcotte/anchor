@@ -1323,7 +1323,7 @@ final class Anchor {
 	 * @param  boolean $upper    If the camel case should be `UpperCamelCase`
 	 * @return string  The converted string
 	 */
-	private static function &camelize($original, $upper=FALSE)
+	private static function camelize($original, $upper=FALSE)
 	{
 		$upper = (int) $upper;
 		$key   = "{$upper}/{$original}";
@@ -1343,11 +1343,15 @@ final class Anchor {
 		// Handle underscore notation
 		} else {
 			$string = strtolower($string);
-			if ($upper) { $string = strtoupper($string[0]) . substr($string, 1); }
-			$string = preg_replace('/((_|-)([a-z0-9]))/e', 'strtoupper("\3")', $string);
+			if ($upper) {
+				$string = strtoupper($string[0]) . substr($string, 1);
+			}
+			$string = preg_replace_callback('/(_|-)([a-z0-9])/', function($matches) {
+		        return strtoupper(ltrim($matches[0], '-_'));
+			}, $string);
 		}
 
-		self::$cache['camelize'][$key] =& $string;
+		self::$cache['camelize'][$key] = $string;
 		return $string;
 	}
 
