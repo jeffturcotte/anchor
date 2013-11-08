@@ -205,7 +205,7 @@ final class Anchor {
 	 */
 	private static $cache = array(
 		'find'         => array(),
-		'underscorize' => array(),
+		'urlize' => array(),
 		'camelize'     => array()
 	);
 
@@ -755,11 +755,11 @@ final class Anchor {
 	 *   %p => active full path
 	 *   %P => active class path
 	 *
-	 * @param string $format         The string to format
-	 * @param boolean $underscorize  If the active callback values should be underscorized, does not affect active path(s)
-	 * @return string                The formatted string
+	 * @param string $format   The string to format
+	 * @param boolean $urlize  If the active callback values should be urlized, does not affect active path(s)
+	 * @return string          The formatted string
 	 */
-	public static function format($format, $underscorize=FALSE, $default=NULL)
+	public static function format($format, $urlize=FALSE, $default=NULL)
 	{
 		// no callback, or format not a string, just return $format
 		if (!($callback = self::getActiveCallback()) || !is_string($format)) {
@@ -777,18 +777,18 @@ final class Anchor {
 		$callback = self::parseCallback($callback);
 
 		// make the path and class path
-		$short_class  = self::underscorize($callback->short_class);
-		$short_method = self::underscorize($callback->short_method);
+		$short_class  = self::urlize($callback->short_class);
+		$short_method = self::urlize($callback->short_method);
 
 		$path = "{$short_class}/{$short_method}";
 		$class_path = $short_class;
 
 		// make the class path
-		$class_path = self::underscorize($callback->short_class);
+		$class_path = self::urlize($callback->short_class);
 
 		// alter the full and class paths with namespace
 		if ($callback->namespace) {
-			$namespace = self::underscorize($callback->namespace);
+			$namespace = self::urlize($callback->namespace);
 			$path =  "{$namespace}/{$path}";
 			$class_path = "{$namespace}/{$class_path}";
 		}
@@ -797,12 +797,12 @@ final class Anchor {
 
 		// set the replacements
 		$replacements = array(
-			'%n' => ($underscorize) ? self::underscorize($callback->namespace) : $callback->namespace,
-			'%N' => ($underscorize) ? self::underscorize($callback->parent_namespace) : $callback->parent_namespace,
-			'%c' => ($underscorize) ? self::underscorize($callback->class) : $callback->class,
-			'%C' => ($underscorize) ? self::underscorize($callback->short_class) : $callback->short_class,
-			'%m' => ($underscorize) ? self::underscorize($callback->method) : $callback->method,
-			'%M' => ($underscorize) ? self::underscorize($callback->short_method) : $callback->short_method,
+			'%n' => ($urlize) ? self::urlize($callback->namespace) : $callback->namespace,
+			'%N' => ($urlize) ? self::urlize($callback->parent_namespace) : $callback->parent_namespace,
+			'%c' => ($urlize) ? self::urlize($callback->class) : $callback->class,
+			'%C' => ($urlize) ? self::urlize($callback->short_class) : $callback->short_class,
+			'%m' => ($urlize) ? self::urlize($callback->method) : $callback->method,
+			'%M' => ($urlize) ? self::urlize($callback->short_method) : $callback->short_method,
 			'%p' => ($path == '/') ? '' : $path,
 			'%P' => ($class_path == '/') ? '' : $class_path
 		);
@@ -1222,6 +1222,58 @@ final class Anchor {
 		throw new AnchorContinueException();
 	}
 
+	/**
+	 * Converts a `camelCase` or `underscore_notation` string to `underscore_notation`
+	 *
+	 * Derived from MIT fGrammer::camelize
+	 * Source: http://flourishlib.com/browser/fGrammar.php
+	 * License: http://flourishlib.com/docs/LicenseAgreement
+	 * Copyright (c) 2007-2011 Will Bond <will@flourishlib.com>
+	 *
+	 * @param  string $string  The string to convert
+	 * @return string  The converted string
+	 */
+	public static function &urlize($string)
+	{
+		$key = $string;
+
+		if (!$string) {
+			return $string;
+		}
+
+		if (isset(self::$cache['urlize'][$key])) {
+			return self::$cache['urlize'][$key];
+		}
+
+		$original = $string;
+
+		$string = strtolower($string[0]) . substr($string, 1);
+
+		// If the string is already underscore notation then leave it
+		if (strpos($string, '_') !== FALSE) {
+
+		// Allow humanized string to be passed in
+		} elseif (strpos($string, ' ') !== FALSE) {
+			$string = strtolower(preg_replace('#\s+#', '_', $string));
+
+		} else {
+			do {
+				$old_string = $string;
+				$string = preg_replace('/([a-zA-Z])([0-9])/', '\1_\2', $string);
+				$string = preg_replace('/([a-z0-9A-Z])([A-Z])/', '\1_\2', $string);
+			} while ($old_string != $string);
+
+			$string = strtolower($string);
+		}
+
+		if (self::$word_delimiter != '_') {
+			$string = str_replace('_', self::$word_delimiter, $string);
+		}
+
+		self::$cache['urlize'][$key] =& $string;
+
+		return $string;
+	}
 
 	// ===============
 	// = Private API =
@@ -1769,7 +1821,7 @@ final class Anchor {
 			if (is_array($params)) {
 				foreach($matches as $name => $param) {
 					if (is_string($name)) {
-						$params[$name] = self::underscorize($param);
+						$params[$name] = self::urlize($param);
 					}
 				}
 			}
@@ -2099,60 +2151,6 @@ final class Anchor {
 	{
 		$string = str_replace('\\', '/', $string);
 		$string = self::makeUrlFriendly($string);
-		return $string;
-	}
-
-
-	/**
-	 * Converts a `camelCase` or `underscore_notation` string to `underscore_notation`
-	 *
-	 * Derived from MIT fGrammer::camelize
-	 * Source: http://flourishlib.com/browser/fGrammar.php
-	 * License: http://flourishlib.com/docs/LicenseAgreement
-	 * Copyright (c) 2007-2011 Will Bond <will@flourishlib.com>
-	 *
-	 * @param  string $string  The string to convert
-	 * @return string  The converted string
-	 */
-	private static function &underscorize($string)
-	{
-		$key = $string;
-
-		if (!$string) {
-			return $string;
-		}
-
-		if (isset(self::$cache['underscorize'][$key])) {
-			return self::$cache['underscorize'][$key];
-		}
-
-		$original = $string;
-
-		$string = strtolower($string[0]) . substr($string, 1);
-
-		// If the string is already underscore notation then leave it
-		if (strpos($string, '_') !== FALSE) {
-
-		// Allow humanized string to be passed in
-		} elseif (strpos($string, ' ') !== FALSE) {
-			$string = strtolower(preg_replace('#\s+#', '_', $string));
-
-		} else {
-			do {
-				$old_string = $string;
-				$string = preg_replace('/([a-zA-Z])([0-9])/', '\1_\2', $string);
-				$string = preg_replace('/([a-z0-9A-Z])([A-Z])/', '\1_\2', $string);
-			} while ($old_string != $string);
-
-			$string = strtolower($string);
-		}
-
-		if (self::$word_delimiter != '_') {
-			$string = str_replace('_', self::$word_delimiter, $string);
-		}
-
-		self::$cache['underscorize'][$key] =& $string;
-
 		return $string;
 	}
 
