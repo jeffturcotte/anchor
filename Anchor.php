@@ -1233,7 +1233,7 @@ final class Anchor {
 	 * @param  string $string  The string to convert
 	 * @return string  The converted string
 	 */
-	public static function &urlize($string)
+	public static function urlize($string)
 	{
 		$key = $string;
 
@@ -1246,8 +1246,7 @@ final class Anchor {
 		}
 
 		$original = $string;
-
-		$string = strtolower($string[0]) . substr($string, 1);
+		$string   = strtolower($string[0]) . substr($string, 1);
 
 		// If the string is already underscore notation then leave it
 		if (strpos($string, '_') !== FALSE) {
@@ -1259,7 +1258,7 @@ final class Anchor {
 		} else {
 			do {
 				$old_string = $string;
-				$string = preg_replace('/([a-zA-Z])([0-9])/', '\1_\2', $string);
+				$string = preg_replace('/([a-zA-Z])([0-9])/',    '\1_\2', $string);
 				$string = preg_replace('/([a-z0-9A-Z])([A-Z])/', '\1_\2', $string);
 			} while ($old_string != $string);
 
@@ -1269,6 +1268,10 @@ final class Anchor {
 		if (self::$word_delimiter != '_') {
 			$string = str_replace('_', self::$word_delimiter, $string);
 		}
+
+		$preg_delimiter = preg_quote(self::$word_delimiter, '/');
+		$string         = preg_replace('/[^a-z0-9' . $preg_delimiter . ']/', '', $string);
+		$string         = preg_replace('/[' . $preg_delimiter . ']+/', self::$word_delimiter, $string);
 
 		self::$cache['urlize'][$key] =& $string;
 
