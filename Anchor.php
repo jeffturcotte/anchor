@@ -2111,7 +2111,7 @@ final class Anchor {
 	 * @param  string   $delimiter   The delimiter to use between words, defaults to `_`
 	 * @return string  The URL-friendly version of the string
 	 */
-	private static function makeUrlFriendly($string, $max_length=NULL, $delimiter=NULL)
+	public static function makeUrlFriendly($string, $max_length=NULL, $delimiter=NULL)
 	{
 		// This allows omitting the max length, but including a delimiter
 		if ($max_length && !is_numeric($max_length)) {
