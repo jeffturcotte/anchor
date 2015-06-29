@@ -1115,7 +1115,7 @@ class Anchor {
 					$linkable
 				);
 
-				if ($callable === FALSE) {
+				if ($callable === FALSE || strpos($callable, ' ') !== FALSE) {
 					throw new AnchorNotFoundException();
 				}
 
