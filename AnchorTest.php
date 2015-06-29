@@ -56,11 +56,11 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 			Anchor::link('TestController::home')
 		);
 		$this->assertEquals(
-			'/test_controller/5/dynamic',
+			'/test-controller/5/dynamic',
 			Anchor::link('TestController::dynamic id', 5)
 		);
 		$this->assertEquals(
-			'/test_controller/5-this_is_the_slug/dynamic',
+			'/test-controller/5-this_is_the_slug/dynamic',
 			Anchor::link('TestController::dynamic id slug', 5, 'this_is_the_slug')
 		);
 	}
@@ -77,8 +77,8 @@ class AnchorTest extends PHPUnit_Framework_TestCase {
 		$this->assertEquals('AuthorizedController', $data->active_short_class);
 		$this->assertEquals('AuthorizedController::index', $data->active_method);
 		$this->assertEquals('index', $data->active_short_method);
-		$this->assertEquals('authorized_controller/index', $data->active_full_path);
-		$this->assertEquals('authorized_controller', $data->active_class_path);
+		$this->assertEquals('authorized-controller/index', $data->active_full_path);
+		$this->assertEquals('authorized-controller', $data->active_class_path);
 
 	}
 }
