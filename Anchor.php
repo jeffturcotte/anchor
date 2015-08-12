@@ -1,6 +1,6 @@
 <?php
 /**
- * Anchor is an *alpha* routing library for PHP 5
+ * Anchor is a routing library for PHP 5
  *
  * @copyright  Copyright (c) 2012 Jeff Turcotte, others
  * @author     Jeff Turcotte [jt] <jeff.turcotte@gmail.com>
@@ -1018,6 +1018,7 @@ class Anchor {
 	 * @param array    &$params  The GET parameters to match against - param mapping from a route may affect values in this array
 	 * @param stdClass &$data    The data from the route, if one is matched
 	 * @param integer  $offset   The index in the array of routes to restart from - this allows resolving multiple times in sequence
+	 * @param boolean  $linkable Whether or not the url is linkable
 	 * @return FALSE|stdClass  Returns FALSE if no matching callback was found, otherwise
 	 */
 	public static function resolve($url, $headers=array(), &$params=array(), &$data=NULL, &$offset=0, &$linkable=TRUE)
@@ -1115,8 +1116,13 @@ class Anchor {
 					$linkable
 				);
 
-				if ($callable === FALSE || strpos($callable, ' ') !== FALSE) {
+				if ($callable === FALSE || (is_string($callable) && strpos($callable, ' ') !== FALSE)) {
 					throw new AnchorNotFoundException();
+				}
+
+				if (!self::validateCallback($callable)) {
+					$offset++;
+					continue;
 				}
 
 				if (static::$canonical_redirect && $linkable) {
@@ -1568,6 +1574,10 @@ class Anchor {
 		}
 		if (isset(static::$closure_aliases_flipped[$callback])) {
 			return TRUE;
+		}
+
+		if (preg_match('/[^A-Za-z:0-1_]/', $callback)) {
+			return FALSE;
 		}
 
 		$callback = static::parseCallback($callback);
