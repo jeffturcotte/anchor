@@ -820,7 +820,7 @@ class Anchor {
 		return $formatted;
 	}
 
-	public function formatNamespace($namespace)
+	public static function formatNamespace($namespace)
 	{
 		$namespaces = explode('/', $namespace);
 		$namespaces = array_map(__CLASS__.'::upperCamelize', $namespaces);
