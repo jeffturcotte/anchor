@@ -12,28 +12,8 @@
  * @license    MIT (see LICENSE or bottom of this file)
  * @package    Anchor
  * @link       http://github.com/jeffturcotte/anchor
- *
- * @version    1.1.0
- * @changes    1.1.0 Backwards Compatibility Break - changed Anchor to DEFAULT to using autoloaders [kh, 2013-09-12]
- * @changes    1.0.1 Fixed parent namespace issue [kg, 2013-09-12]
- * @changes    1.0.0 Added multiple namespace support [jt, 2013-07-11]
- * @changes    1.0.0a16 [BREAK] Added permanent canonical redirect option and dash word delimiter options [jt, 2013-02-28]
- * @changes    1.0.0a15 Added ungreedy flag to pattern matcher [jt, 2013-1-18]
- * @changes    1.0.0a14 Fixed issue with class authorization [jt, 2012-10-24]
- * @changes    1.0.0a13 Fixed hook collection between __construct and init hooks, Adding hooks IN init hook no longer allowed [jt, 2012-10-24]
- * @changes    1.0.0a12 Added case sensitivity check to validateCallback() [bb, 2012-08-17]
- * @changes    1.0.0a11 Added setCanonicalRedirect option [jt, 2012-06-12]
- * @changes    1.0.0a10 Fixed bug with callHookCallbacks for catch hooks [jt, 2012-06-06]
- * @changes    1.0.0a9 Brought back * suffix route definition [jt, 2012-02-28]
- * @changes    1.0.0a8 Renamed enableStrictRouting to disableTrailingSlashRedirect [jt, 2012-01-30]
- * @changes    1.0.0a7 Added * param type to replace * prefix and suffix [jt, 2012-01-30]
- * @changes    1.0.0a6 Added support for different URL formatters for different params [wb, 2011-10-18]
- * @changes    1.0.0a5 Added check() [wb, 2011-09-22]
- * @changes    1.0.0a4 Added setCallbackParamName() [jt, 2011-09-08]
- * @changes    1.0.0a3 Added automatic redirection of URLs with trailing slashes, ::enableStrictRouting() [wb, 2011-08-26]
- * @changes    1.0.0a2 Fixed issue with callback pattern where namespace was being included in class [jt, 2011-08-24]
- *
  */
+
 class AnchorNotFoundException extends Exception {}
 class AnchorContinueException extends Exception {}
 class AnchorProgrammerException extends Exception {}
@@ -1576,7 +1556,7 @@ class Anchor {
 			return TRUE;
 		}
 
-		if (preg_match('/[^A-Za-z:0-1_]/', $callback)) {
+		if (preg_match('/[^A-Za-z:0-1_\\\\]/', $callback)) {
 			return FALSE;
 		}
 
