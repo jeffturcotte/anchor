@@ -1556,7 +1556,7 @@ class Anchor {
 			return TRUE;
 		}
 
-		if (preg_match('/[^A-Za-z:0-1_\\\\]/', $callback)) {
+		if (preg_match('/[^A-Za-z:0-9_\\\\]/', $callback)) {
 			return FALSE;
 		}
 
