@@ -14,80 +14,149 @@
  * @link       http://github.com/jeffturcotte/anchor
  */
 
+class AnchorForbiddenException extends Exception {}
+class AnchorNotAuthorizedException extends Exception {}
 class AnchorNotFoundException extends Exception {}
 class AnchorContinueException extends Exception {}
 class AnchorProgrammerException extends Exception {}
 
 final class AnchorDefaultAdapter {
+
+	function printFooter()
+	{
+		?>
+					</div>
+				</body>
+			</html>
+		<?php
+	}
+
+	function printHeader()
+	{
+		?>
+			<html>
+				<head>
+					<title>Whoops! We're lost :-(</title>
+
+					<link href='http://fonts.googleapis.com/css?family=Oswald&amp;v1' rel='stylesheet' type='text/css'>
+
+					<style type="text/css">
+						body {
+							margin: 0;
+							padding: 0;
+							background: #ddd;
+							color: #444;
+							font-size: 20px;
+							font-family: 'Oswald', Helvetica, Arial, sans-serif;
+						}
+						#container {
+							width: 900px;
+							margin: 30px auto;
+						}
+						.troubleshooting {
+							background: #aaa;
+							padding: 15px 30px 30px;
+							border-radius: 10px;
+							margin: 0 -30px;
+						}
+						h1, h2 {
+							text-transform: uppercase;
+						}
+						h1 {
+							color: #333;
+							font-size: 60px;
+						}
+						h2 {
+							color: #333;
+							font-size: 30px;
+						}
+					</style>
+				</head>
+				<body>
+					<div id="container">
+		<?php
+	}
+
+	function forbidden()
+	{
+		if (!headers_sent()) {
+			header("HTTP/1.1 403 Forbidden");
+		}
+
+		$this->printHeader();
+
+		?>
+			<h1>Anchor: 403</h1>
+
+			<div class="troubleshooting">
+				<h2>Troubleshooting</h2>
+
+				<p>Anchor found a route, however, the user you're logged in as does not have access ot it.</p>
+
+				<ul>
+					<li>Make sure you're logged in as the right user</li>
+					<li>If you don't require authorization at that level, don't <code>::triggerForbidden</code></code></li>
+				</ul>
+			</div>
+		<?php
+
+		$this->printFooter();
+	}
+
+
+	function notAuthorized()
+	{
+		if (!headers_sent()) {
+			header("HTTP/1.1 401 Unauthorized");
+		}
+
+		$this->printHeader();
+
+		?>
+			<h1>Anchor: 401</h1>
+
+			<div class="troubleshooting">
+				<h2>Troubleshooting</h2>
+
+				<p>Anchor found a route, however, the route is requesting authorization.</p>
+
+				<ul>
+					<li>Make sure you're logged in</li>
+					<li>If you don't require authorization, don't <code>::triggerNotAuthorized</code></code></li>
+				</ul>
+			</div>
+		<?php
+
+		$this->printFooter();
+	}
+
 	function notFound()
 	{
 		if (!headers_sent()) {
 			header("HTTP/1.1 404 Not Found");
 		}
+
+		$this->printHeader();
+
 		?>
+			<h1>Anchor: 404</h1>
 
-		<html>
-			<head>
-				<title>404 Not Found :-(</title>
+			<div class="troubleshooting">
+				<h2>Troubleshooting</h2>
 
-				<link href='http://fonts.googleapis.com/css?family=Oswald&amp;v1' rel='stylesheet' type='text/css'>
+				<p>Anchor can't find a route to this URL or a valid controller method.</p>
 
-				<style type="text/css">
-					body {
-						margin: 0;
-						padding: 0;
-						background: #ddd;
-						color: #444;
-						font-size: 20px;
-						font-family: 'Oswald', Helvetica, Arial, sans-serif;
-					}
-					#container {
-						width: 900px;
-						margin: 30px auto;
-					}
-					.troubleshooting {
-						background: #aaa;
-						padding: 15px 30px 30px;
-						border-radius: 10px;
-						margin: 0 -30px;
-					}
-					h1, h2 {
-						text-transform: uppercase;
-					}
-					h1 {
-						color: #333;
-						font-size: 60px;
-					}
-					h2 {
-						color: #333;
-						font-size: 30px;
-					}
-				</style>
-			</head>
-			<body>
-				<div id="container">
-					<h1>Anchor: 404</h1>
-
-					<div class="troubleshooting">
-						<h2>Troubleshooting</h2>
-
-						<p>Anchor can't find a route to this URL or a valid controller method.</p>
-
-						<ul>
-							<li>Check your controller path location. See <code>::setControllerPath()</code></li>
-							<li>Is your controller class authorized for execution? See <code>::authorize()</code></li>
-							<li>Is your controller method a public instance method?</li>
-							<li>Don't want to see this page? Set your own 404 callback. See <code>::setNotFoundCallback()</code></li>
-							<li>Have you set up a route to this URL? See <code>::add()</code></li>
-						</ul>
-					</div>
-				</div>
-			</body>
-
-
-		</html>
-
+				<ul>
+					<li>Check your controller path location. See <code>::setControllerPath()</code></li>
+					<li>Is your controller class authorized for execution? See <code>::authorize()</code></li>
+					<li>Is your controller method a public instance method?</li>
+					<li>Don't want to see this page? Set your own 404 callback. See <code>::setNotFoundCallback()</code></li>
+					<li>Have you set up a route to this URL? See <code>::add()</code></li>
+				</ul>
+			</div>
 		<?php
+
+		$this->printFooter();
 	}
 }
 
@@ -243,6 +312,20 @@ class Anchor {
 		'json'   => '[accept-type=application/json]',
 		'xml'    => '[accept-type=text/xml]'
 	);
+
+	/**
+	 * The callback to execute when a matching route is not found
+	 *
+	 * @var string
+	 */
+	protected static $forbidden_callback = 'AnchorDefaultAdapter::forbidden';
+
+	/**
+	 * The callback to execute when a matching route is not found
+	 *
+	 * @var string
+	 */
+	protected static $not_authorized_callback = 'AnchorDefaultAdapter::notAuthorized';
 
 	/**
 	 * The callback to execute when a matching route is not found
@@ -450,7 +533,13 @@ class Anchor {
 			static::$closure_aliases_flipped[$callback] = $alias;
 		}
 
-		if ($map == '404') {
+		if ($map == '401') {
+			static::$not_authorized_callback = $callback;
+			return;
+		} elseif ($map == '403') {
+			static::$forbidden_callback = $callback;
+			return;
+		} elseif ($map == '404') {
 			static::$not_found_callback = $callback;
 			return;
 		}
@@ -1126,6 +1215,16 @@ class Anchor {
 					$offset++;
 					continue;
 				}
+			} catch (AnchorForbidden $e) {
+				if (!static::call(static::$forbidden_callback)) {
+					static::call('AnchorDefaultAdapter::forbidden');
+				}
+				break;
+			} catch (AnchorNotAuthorizedException $e) {
+				if (!static::call(static::$not_authorized_callback)) {
+					static::call('AnchorDefaultAdapter::notAuthorized');
+				}
+				break;
 			} catch (AnchorNotFoundException $e) {
 				if (!static::call(static::$not_found_callback)) {
 					static::call('AnchorDefaultAdapter::notFound');
@@ -1184,6 +1283,28 @@ class Anchor {
 	{
 		$token = strtolower($token);
 		static::$tokens[$token] = $conditions;
+	}
+
+	/**
+	 * Triggers the anchor 403 handler at any point during routing
+	 *
+	 * @throws AnchorForbiddenException
+	 * @return void
+	 **/
+	public static function triggerForbidden()
+	{
+		throw new AnchorForbiddenException();
+	}
+
+	/**
+	 * Triggers the anchor 401 handler at any point during routing
+	 *
+	 * @throws AnchorNotAuthorizedException
+	 * @return void
+	 **/
+	public static function triggerNotAuthorized()
+	{
+		throw new AnchorNotAuthorizedException();
 	}
 
 	/**
