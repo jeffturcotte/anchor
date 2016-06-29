@@ -1215,7 +1215,7 @@ class Anchor {
 					$offset++;
 					continue;
 				}
-			} catch (AnchorForbidden $e) {
+			} catch (AnchorForbiddenException $e) {
 				if (!static::call(static::$forbidden_callback)) {
 					static::call('AnchorDefaultAdapter::forbidden');
 				}
