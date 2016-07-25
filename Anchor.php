@@ -1262,8 +1262,9 @@ class Anchor {
 		}
 	}
 
+
 	/**
-	 * undocumented function
+	 * Configures legacy namespacing
 	 *
 	 * @return void
 	 */
@@ -1271,6 +1272,18 @@ class Anchor {
 		static::$callback_param_formatters['namespace'] = 'Anchor::upperCamelize';
 		static::$namespace_separator = '_';
 	}
+	
+	
+	/**
+	 * Configures underscore as the word delimiter
+	 *
+	 * @return void
+	 */
+	public static function setLegacyWordDelimiter()
+	{
+		self::$word_delimiter = '_';
+	}
+
 
 	/**
 	 * Set a token to use as shorthand for header conditions in in a route
