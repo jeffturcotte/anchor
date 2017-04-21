@@ -1160,12 +1160,8 @@ class Anchor {
 	public static function run($exit=TRUE)
 	{
 		$request_path = static::getRequestPath();
-		if (static::$redirect_trailing_slashes && strlen($request_path) > 1 && substr($request_path, -1) === '/') {
-			$trimmed_request_path = substr($request_path, 0, -1);
-			$query_string = strlen($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
-			header('Location: ' . static::getDomain() . $trimmed_request_path . $query_string);
-			exit;
-		}
+
+        self::cleanUrlRedirect($request_path);
 
 		static::$running = TRUE;
 
@@ -1241,6 +1237,39 @@ class Anchor {
 		}
 	}
 
+
+    /**
+     * If $redirect_trailing_slashes is true, strips the trailing slash off the $request_path
+     * If there are capital letters in the $request_path, converts to lower case
+     * If either is true, redirects to the correct URL.
+     *
+     * @param string $request_path A REQUEST_URI without a query string
+     */
+    protected static function cleanUrlRedirect($request_path)
+    {
+        $redirect = false;
+
+        // Test for trailing slash
+        if (static::$redirect_trailing_slashes && strlen($request_path) > 1 && substr($request_path, -1) === '/') {
+            $request_path   = substr($request_path, 0, -1);
+            $redirect = true;
+        }
+
+        // $request_path should always be lower case.
+        $lower_case_path = strtolower($request_path);
+
+        if ($request_path != $lower_case_path) {
+            $request_path = $lower_case_path;
+            $redirect = true;
+        }
+
+        if ($redirect) {
+            $request_path .= strlen($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
+            header('Location: ' . static::getDomain() . $request_path);
+            exit;
+        }
+    }
+
 	/**
 	 * undocumented function
 	 *
@@ -1272,8 +1301,8 @@ class Anchor {
 		static::$callback_param_formatters['namespace'] = 'Anchor::upperCamelize';
 		static::$namespace_separator = '_';
 	}
-	
-	
+
+
 	/**
 	 * Configures underscore as the word delimiter
 	 *
