@@ -1,0 +1,19 @@
+{
+    "name": "imarc/anchor",
+    "description": "A routing library for PHP",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jeff Turcotte",
+            "role": "Developer",
+            "email": "jeff.turcotte@gmail.com"
+        }
+    ],
+    "autoload": {
+        "classmap": ["."]
+    },
+    "require": {
+        "php": ">=5.3.0"
+	}
+}
