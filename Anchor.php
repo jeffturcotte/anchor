@@ -1255,14 +1255,6 @@ class Anchor {
             $redirect = true;
         }
 
-        // $request_path should always be lower case.
-        $lower_case_path = strtolower($request_path);
-
-        if ($request_path != $lower_case_path) {
-            $request_path = $lower_case_path;
-            $redirect = true;
-        }
-
         if ($redirect) {
             $request_path .= strlen($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
             header('Location: ' . static::getDomain() . $request_path);
