@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<phpunit bootstrap="AnchorTest.php" colors="true">
+	<testsuites>
+		<testsuite name="AnchorTest">
+			<file>AnchorTest.php</file>
+		</testsuite>
+	</testsuites>
+</phpunit>
