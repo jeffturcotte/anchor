@@ -2093,6 +2093,10 @@ class Anchor {
 			$matches
 		);
 
+		if (self::$running && empty($matches)) {
+			throw new AnchorNotFoundException();
+		}
+
 		$callback = (object) $callback;
 
 		// set callback properties
